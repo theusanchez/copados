@@ -14,7 +14,11 @@
     <!-- ============================================================
        Login view
        ============================================================ -->
-    <div id="view-login">
+    <div id="view-loading" aria-label="Carregando">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <div id="view-login" class="hidden">
       <div class="login-card">
         <span class="login-logo" aria-hidden="true">⚽</span>
         <h1 class="login-title">Copa 2026</h1>
@@ -50,7 +54,7 @@
     <!-- ============================================================
        App view (post-login)
        ============================================================ -->
-    <div id="view-app" class="hidden">
+    <div id="view-app" class="hidden" aria-live="polite">
       <header role="banner">
         <span class="header-logo" aria-label="Copa 2026">⚽ Copa 2026</span>
 

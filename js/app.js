@@ -64,12 +64,18 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 // -----------------------------------------------------------------------
 // View switching
 // -----------------------------------------------------------------------
+function hideLoading() {
+  document.getElementById('view-loading').classList.add('hidden');
+}
+
 function showLogin() {
+  hideLoading();
   document.getElementById('view-login').classList.remove('hidden');
   document.getElementById('view-app').classList.add('hidden');
 }
 
 function showApp() {
+  hideLoading();
   document.getElementById('view-login').classList.add('hidden');
   document.getElementById('view-app').classList.remove('hidden');
   switchMainView('groups');
