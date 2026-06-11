@@ -71,11 +71,25 @@ export function resolveSlot(slot, adv, koResults) {
 // koResults: { matchId: { home:N, away:N, homeTeam:string, awayTeam:string, penWinner?:string } }
 export function buildKnockoutMatches(adv, koResults) {
   const resolved = {};
+  const usedThirds = new Set(); // each 3rd-place team can only fill one slot
+
+  function resolveSlotTracked(slot) {
+    if (slot.type === 'b3') {
+      const eligible = adv.bestThirds.filter(
+        t => slot.groups.includes(t.group) && !usedThirds.has(t.team)
+      );
+      const team = eligible[0]?.team || `3° (${slot.groups.join('/')})`;
+      if (eligible[0]) usedThirds.add(team);
+      return team;
+    }
+    return resolveSlot(slot, adv, resolved);
+  }
+
   const rounds = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
   rounds.forEach(round => {
     KNOCKOUT[round].forEach(match => {
-      const homeTeam = resolveSlot(match.home, adv, resolved);
-      const awayTeam = resolveSlot(match.away, adv, resolved);
+      const homeTeam = resolveSlotTracked(match.home);
+      const awayTeam = resolveSlotTracked(match.away);
       const r = koResults[match.id] || {};
       resolved[match.id] = {
         ...match,
