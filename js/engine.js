@@ -78,9 +78,11 @@ export function buildKnockoutMatches(adv, koResults) {
       const eligible = adv.bestThirds.filter(
         t => slot.groups.includes(t.group) && !usedThirds.has(t.team)
       );
-      const team = eligible[0]?.team || `3° (${slot.groups.join('/')})`;
-      if (eligible[0]) usedThirds.add(team);
-      return team;
+      // fallback: any unused best-third when no eligible match found
+      const anyUnused = adv.bestThirds.filter(t => !usedThirds.has(t.team));
+      const picked = eligible[0] ?? anyUnused[0];
+      if (picked) { usedThirds.add(picked.team); return picked.team; }
+      return '?';
     }
     return resolveSlot(slot, adv, resolved);
   }
