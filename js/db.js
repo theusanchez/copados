@@ -1,17 +1,23 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged }
-  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {
+  initializeAuth, browserLocalPersistence, browserPopupRedirectResolver,
+  signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged,
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, doc, setDoc, getDocs, collection, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+export const auth = initializeAuth(app, {
+  persistence: browserLocalPersistence,
+  popupRedirectResolver: browserPopupRedirectResolver,
+});
 export const db = getFirestore(app);
 
 const provider = new GoogleAuthProvider();
 
-export const loginWithGoogle = () => signInWithPopup(auth, provider);
+export const loginWithGoogle = () =>
+  signInWithPopup(auth, provider, browserPopupRedirectResolver);
 export const logout = () => signOut(auth);
 export const onAuthChange = cb => onAuthStateChanged(auth, cb);
 
