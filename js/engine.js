@@ -105,3 +105,63 @@ export function buildKnockoutMatches(adv, koResults) {
   });
   return resolved;
 }
+
+// Resolve a user's full knockout bracket (teams + their predicted scores) from preds.
+export function resolveKnockout(preds) {
+  const adv = computeAdvancing(preds);
+  const koResults = {};
+  Object.values(KNOCKOUT).flat().forEach(m => {
+    if (preds[m.id]) koResults[m.id] = preds[m.id];
+  });
+  return buildKnockoutMatches(adv, koResults);
+}
+
+// -----------------------------------------------------------------------
+// Scoring: exact score = 5, correct outcome = 3, otherwise 0
+// -----------------------------------------------------------------------
+const GROUP_IDS = new Set(Object.values(GROUPS).flatMap(g => g.matches.map(m => m.id)));
+
+function scorelinePoints(ph, pa, rh, ra) {
+  if (ph == null || pa == null || rh == null || ra == null) return 0;
+  ph = Number(ph); pa = Number(pa); rh = Number(rh); ra = Number(ra);
+  if (ph === rh && pa === ra) return 5;
+  return Math.sign(ph - pa) === Math.sign(rh - ra) ? 3 : 0;
+}
+
+function sameTeams(a, b) {
+  return (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]);
+}
+
+// Points a user earns on one match. Knockout only scores if the predicted
+// matchup (both teams) equals the actual matchup.
+export function matchPoints(matchId, preds, koMatches, results) {
+  const r = results[matchId];
+  if (!r || r.status !== 'finished' || r.home == null || r.away == null) return 0;
+
+  if (GROUP_IDS.has(matchId)) {
+    const p = preds[matchId];
+    if (!p) return 0;
+    return scorelinePoints(p.home, p.away, r.home, r.away);
+  }
+
+  const km = koMatches[matchId];
+  if (!km || km.home == null || km.away == null) return 0;
+  if (!sameTeams([km.homeTeam, km.awayTeam], [r.homeTeam, r.awayTeam])) return 0;
+  // Align the predicted scoreline to the real home/away orientation.
+  return km.homeTeam === r.homeTeam
+    ? scorelinePoints(km.home, km.away, r.home, r.away)
+    : scorelinePoints(km.home, km.away, r.away, r.home);
+}
+
+// Total points + breakdown for a user across all known results.
+export function scoreUser(preds, results) {
+  const koMatches = resolveKnockout(preds);
+  let total = 0, exact = 0, correct = 0;
+  Object.keys(results).forEach(id => {
+    const pts = matchPoints(id, preds, koMatches, results);
+    total += pts;
+    if (pts === 5) exact++;
+    else if (pts === 3) correct++;
+  });
+  return { total, exact, correct };
+}

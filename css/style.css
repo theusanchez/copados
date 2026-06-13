@@ -265,37 +265,6 @@ header {
 }
 
 /* ================================================================
-   Viewing notice banner
-   ================================================================ */
-.viewing-notice {
-  background: var(--gold);
-  color: #000;
-  text-align: center;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-}
-
-.btn-secondary {
-  background: none;
-  border: 1px solid currentColor;
-  color: inherit;
-  border-radius: var(--radius-sm);
-  padding: 0.25rem 0.75rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.btn-small {
-  font-size: 0.8rem;
-  padding: 0.2rem 0.5rem;
-}
-
-/* ================================================================
    Main content area
    ================================================================ */
 main {
@@ -406,6 +375,16 @@ main {
   font-size: 1.4rem;
   line-height: 1;
   flex-shrink: 0;
+}
+
+/* Flag images (flagcdn) — sized in em so they scale with each context's font-size */
+.flag-icon {
+  height: 1em;
+  width: 1.5em;
+  object-fit: cover;
+  border-radius: 2px;
+  vertical-align: middle;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .team-name {
@@ -718,6 +697,329 @@ main {
   color: var(--subtext);
   text-align: center;
   padding: 2rem;
+}
+
+/* Finished / in-progress sections */
+.compare-section {
+  margin-bottom: 1.5rem;
+}
+.compare-section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.75rem;
+}
+.compare-count {
+  color: var(--subtext);
+  font-weight: 400;
+}
+
+/* ================================================================
+   Comparison detail ("you vs them")
+   ================================================================ */
+.compare-detail {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+}
+.cmp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.cmp-header h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.cmp-vs {
+  color: var(--subtext);
+  font-weight: 400;
+}
+.cmp-close {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--subtext);
+  border-radius: var(--radius-sm);
+  width: 32px;
+  height: 32px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.cmp-close:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+.cmp-champions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0.75rem 0 1rem;
+  font-size: 0.85rem;
+  color: var(--subtext);
+}
+.cmp-champions strong {
+  color: var(--gold);
+}
+
+.cmp-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.cmp-tab {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--subtext);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.cmp-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.cmp-group-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 1rem 0 0.5rem;
+}
+.cmp-match {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.cmp-fixture {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.cmp-fx-team {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.cmp-fx-team:first-child {
+  justify-content: flex-end;
+}
+.cmp-fx-x {
+  color: var(--subtext);
+}
+.cmp-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+}
+.cmp-who {
+  width: 40%;
+  color: var(--subtext);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmp-score {
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.cmp-row-ok .cmp-score {
+  color: var(--green);
+}
+.cmp-row-diff .cmp-score {
+  color: var(--amber);
+}
+.cmp-badge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.cmp-ok {
+  color: var(--green);
+}
+.cmp-diff {
+  color: var(--amber);
+}
+
+/* Knockout rows: self-contained per user (teams differ) */
+.cmp-ko-row {
+  flex-wrap: wrap;
+}
+.cmp-ko-line {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+.cmp-ko-line strong {
+  font-variant-numeric: tabular-nums;
+}
+.cmp-pen {
+  color: var(--subtext);
+  font-size: 0.75rem;
+}
+
+/* ================================================================
+   Locked matches + real result
+   ================================================================ */
+.match-card.locked {
+  opacity: 0.85;
+}
+.match-card.locked .score-input {
+  background: var(--bg);
+  color: var(--subtext);
+  cursor: not-allowed;
+  border-color: transparent;
+}
+.match-result {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.8rem;
+  color: var(--text);
+}
+.result-label {
+  color: var(--subtext);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+.result-pts {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-sm);
+}
+.pts-exact {
+  color: #fff;
+  background: var(--green);
+}
+.pts-partial {
+  color: #000;
+  background: var(--amber);
+}
+.pts-zero {
+  color: var(--subtext);
+  background: var(--border);
+}
+
+/* ================================================================
+   Ranking view
+   ================================================================ */
+.ranking-empty {
+  color: var(--subtext);
+  text-align: center;
+  padding: 1.5rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+}
+.ranking-row-me {
+  border-color: var(--gold);
+}
+.ranking-pos {
+  width: 1.75rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--subtext);
+  flex-shrink: 0;
+}
+.ranking-row:nth-child(1) .ranking-pos {
+  color: var(--gold);
+}
+.ranking-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+}
+.ranking-avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--subtext);
+  flex-shrink: 0;
+}
+.ranking-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.ranking-name {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ranking-stats {
+  font-size: 0.72rem;
+  color: var(--subtext);
+}
+.ranking-points {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.ranking-points small {
+  font-size: 0.65rem;
+  color: var(--subtext);
+  font-weight: 500;
+  margin-left: 0.15rem;
 }
 
 /* ================================================================

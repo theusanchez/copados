@@ -1,0 +1,16 @@
+{
+  "name": "copados-results-ingest",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fetches FIFA World Cup results from football-data.org and writes them to the copados Firestore 'results' collection.",
+  "scripts": {
+    "ingest": "node ingest.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

@@ -1,0 +1,33 @@
+name: Ingest World Cup results
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 min (GitHub may delay during peak load)
+  workflow_dispatch: {}
+
+concurrency:
+  group: results-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: scripts/results/package-lock.json
+
+      - name: Install dependencies
+        working-directory: scripts/results
+        run: npm ci
+
+      - name: Ingest results into Firestore
+        working-directory: scripts/results
+        env:
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: npm run ingest

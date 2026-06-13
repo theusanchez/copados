@@ -59,3 +59,11 @@ export async function loadAllUsers() {
 export async function loadUserPreds(uid) {
   return loadPreds(uid);
 }
+
+// Load actual match results written by the results Cloud Function: { matchId: {...} }
+export async function loadResults() {
+  const snap = await getDocs(collection(db, 'results'));
+  const out = {};
+  snap.forEach(d => { out[d.id] = d.data(); });
+  return out;
+}
