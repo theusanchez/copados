@@ -1109,40 +1109,103 @@ async function joinLeagueFlow(code) {
 // -----------------------------------------------------------------------
 // Ranking view
 // -----------------------------------------------------------------------
+// Ordered scoring rounds, used to compute per-round points and position movement.
+const groupIdsByMd = md =>
+  Object.values(GROUPS).flatMap(g => g.matches).filter(m => m.md === md).map(m => m.id);
+
+const RANKING_ROUNDS = [
+  { label: 'Rodada 1 (grupos)', ids: groupIdsByMd(1) },
+  { label: 'Rodada 2 (grupos)', ids: groupIdsByMd(2) },
+  { label: 'Rodada 3 (grupos)', ids: groupIdsByMd(3) },
+  { label: ROUND_LABELS.r32, ids: KNOCKOUT.r32.map(m => m.id) },
+  { label: ROUND_LABELS.r16, ids: KNOCKOUT.r16.map(m => m.id) },
+  { label: ROUND_LABELS.qf, ids: KNOCKOUT.qf.map(m => m.id) },
+  { label: ROUND_LABELS.sf, ids: KNOCKOUT.sf.map(m => m.id) },
+  { label: 'Final / 3º lugar', ids: [...KNOCKOUT.third, ...KNOCKOUT.final].map(m => m.id) },
+];
+
+// Results restricted to every match up to and including round `idx`.
+function resultsUpTo(idx) {
+  const allow = new Set(RANKING_ROUNDS.slice(0, idx + 1).flatMap(r => r.ids));
+  const out = {};
+  Object.keys(results).forEach(id => { if (allow.has(id)) out[id] = results[id]; });
+  return out;
+}
+
+function movementChip(e, hasPrev) {
+  if (!hasPrev || e.prevPos == null) {
+    return '<span class="rank-move rank-move-flat" aria-label="estreia">•</span>';
+  }
+  const d = e.prevPos - e.pos;
+  if (d > 0) return `<span class="rank-move rank-move-up" aria-label="subiu ${d}">▲${d}</span>`;
+  if (d < 0) return `<span class="rank-move rank-move-down" aria-label="caiu ${-d}">▼${-d}</span>`;
+  return '<span class="rank-move rank-move-flat" aria-label="manteve">–</span>';
+}
+
 async function renderRankingView() {
   const container = document.getElementById('view-ranking');
   container.innerHTML = '<p class="loading-msg">Carregando...</p>';
 
-  const hasResults = Object.values(results).some(r => r.status === 'finished');
   const users = scopeUsers(await loadAllUsers());
-  const rows = (await Promise.all(users.map(async u => {
-    const preds = await loadUserPreds(u.uid);
-    return { user: u, ...scoreUser(preds, results) };
-  }))).sort((a, b) =>
-    b.total - a.total || b.exact - a.exact || b.correct - a.correct ||
-    (a.user.displayName || '').localeCompare(b.user.displayName || '')
-  );
+  const preds = {};
+  await Promise.all(users.map(async u => { preds[u.uid] = await loadUserPreds(u.uid); }));
 
-  const rowsHtml = rows.map((r, i) => {
-    const isMe = currentUser && r.user.uid === currentUser.uid;
+  // Which rounds have been (at least partially) played, in order.
+  const playedIdx = RANKING_ROUNDS
+    .map((r, i) => (r.ids.some(id => results[id]?.status === 'finished') ? i : -1))
+    .filter(i => i >= 0);
+  const lastIdx = playedIdx[playedIdx.length - 1];
+  const prevIdx = playedIdx.length > 1 ? playedIdx[playedIdx.length - 2] : null;
+  const hasResults = lastIdx != null;
+  const prevResults = prevIdx != null ? resultsUpTo(prevIdx) : null;
+
+  const nameCmp = (a, b) => (a.user.displayName || '').localeCompare(b.user.displayName || '');
+
+  const entries = users.map(u => {
+    const cur = scoreUser(preds[u.uid], results);
+    const prev = prevResults ? scoreUser(preds[u.uid], prevResults) : null;
+    return { user: u, ...cur, prev, prevTotal: prev ? prev.total : 0 };
+  });
+
+  const curOrder = [...entries].sort((a, b) =>
+    b.total - a.total || b.exact - a.exact || b.correct - a.correct || nameCmp(a, b));
+  curOrder.forEach((e, i) => { e.pos = i + 1; });
+
+  if (prevResults) {
+    const prevOrder = [...entries].sort((a, b) =>
+      b.prev.total - a.prev.total || b.prev.exact - a.prev.exact ||
+      b.prev.correct - a.prev.correct || nameCmp(a, b));
+    prevOrder.forEach((e, i) => { e.prevPos = i + 1; });
+  }
+
+  const rowsHtml = curOrder.map(e => {
+    const isMe = currentUser && e.user.uid === currentUser.uid;
+    const roundPts = e.total - e.prevTotal;
+    const roundBadge = hasResults && roundPts > 0
+      ? `<span class="ranking-round-pts">+${roundPts}</span>` : '';
     return `
       <div class="ranking-row${isMe ? ' ranking-row-me' : ''}">
-        <span class="ranking-pos">${i + 1}</span>
-        ${avatarHtml(r.user, 'ranking-avatar')}
+        <span class="ranking-pos">${e.pos}</span>
+        ${movementChip(e, !!prevResults)}
+        ${avatarHtml(e.user, 'ranking-avatar')}
         <div class="ranking-info">
-          <span class="ranking-name">${r.user.displayName}${isMe ? ' (eu)' : ''}</span>
-          <span class="ranking-stats">${r.exact} cravadas · ${r.correct} resultados</span>
+          <span class="ranking-name">${e.user.displayName}${isMe ? ' (eu)' : ''}</span>
+          <span class="ranking-stats">${e.exact} cravadas · ${e.correct} resultados</span>
         </div>
-        <span class="ranking-points">${r.total}<small>pts</small></span>
+        <span class="ranking-points">${roundBadge}<span class="ranking-total">${e.total}<small>pts</small></span></span>
       </div>`;
   }).join('');
 
   const empty = hasResults ? '' :
     `<p class="ranking-empty">Os jogos ainda não começaram — o ranking aparece assim que os primeiros resultados saírem.</p>`;
+  const roundNote = hasResults
+    ? `<p class="ranking-round-note">Última rodada pontuada: <strong>${RANKING_ROUNDS[lastIdx].label}</strong> — o <span class="rank-move rank-move-up">▲</span>/<span class="rank-move rank-move-down">▼</span> mostra a variação desde a rodada anterior.</p>`
+    : '';
 
   container.innerHTML = `
     <div class="compare-header"><h2>Ranking · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}</div>
     ${empty}
+    ${roundNote}
     <div class="ranking-list">${rowsHtml}</div>
   `;
 

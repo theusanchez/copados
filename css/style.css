@@ -1354,17 +1354,61 @@ main {
   color: var(--subtext);
 }
 .ranking-points {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+.ranking-total {
   font-size: 1.35rem;
   font-weight: 700;
   color: var(--text);
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
+  line-height: 1.1;
 }
-.ranking-points small {
+.ranking-total small {
   font-size: 0.65rem;
   color: var(--subtext);
   font-weight: 500;
   margin-left: 0.15rem;
+}
+.ranking-round-pts {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--green);
+  background: rgba(63, 185, 80, 0.14);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
+/* Position movement vs the previous scored round */
+.rank-move {
+  width: 1.6rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.rank-move-up {
+  color: var(--green);
+}
+.rank-move-down {
+  color: var(--red);
+}
+.rank-move-flat {
+  color: var(--subtext);
+}
+
+.ranking-round-note {
+  font-size: 0.8rem;
+  color: var(--subtext);
+  margin-bottom: 0.85rem;
+  line-height: 1.45;
+}
+.ranking-round-note .rank-move {
+  width: auto;
 }
 
 /* ================================================================
