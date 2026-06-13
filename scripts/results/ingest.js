@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { GROUPS, KNOCKOUT } from '../../js/data.js';
 import { computeAdvancing, buildKnockoutMatches } from '../../js/engine.js';
 import { toPt } from './teams.js';
+import { resultChanged } from './diff.js';
 
 const API_URL = 'https://api.football-data.org/v4/competitions/WC/matches';
 const TOKEN = process.env.FOOTBALL_DATA_TOKEN;
@@ -146,20 +147,28 @@ async function main() {
     }
   }
 
-  // 3) Persist.
+  // 3) Persist only what changed — keeps writes (and the live listeners' read cost)
+  //    proportional to actual updates instead of rewriting every doc each run.
   const db = admin.firestore();
+  const existingSnap = await db.collection('results').get();
+  const existing = {};
+  existingSnap.forEach(d => { existing[d.id] = d.data(); });
+
   const batch = db.batch();
+  let writes = 0;
   for (const [id, d] of Object.entries(docs)) {
+    if (!resultChanged(existing[id], d)) continue;
     batch.set(
       db.collection('results').doc(id),
       { ...d, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
       { merge: true }
     );
+    writes++;
   }
-  await batch.commit();
+  if (writes) await batch.commit();
 
   const finished = Object.values(docs).filter(d => d.status === 'finished').length;
-  console.log(`Wrote ${Object.keys(docs).length} results (${finished} finished). API returned ${matches.length} matches.`);
+  console.log(`Wrote ${writes} changed result(s) of ${Object.keys(docs).length} mapped (${finished} finished). API returned ${matches.length} matches.`);
   if (unmapped.length) {
     console.warn(`\n${unmapped.length} API match(es) not mapped to an app ID (check draw/team names):`);
     unmapped.forEach(u => console.warn('  - ' + u));
