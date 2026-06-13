@@ -2,12 +2,14 @@ name: Ingest World Cup results
 
 on:
   schedule:
-    - cron: "*/10 * * * *" # every 10 min (GitHub may delay during peak load)
+    # Every ~3 min so live scores and halftime (PAUSED) transitions are caught in
+    # time. Free on public repos. GitHub may still delay schedules under peak load.
+    - cron: "*/3 * * * *"
   workflow_dispatch: {}
 
 concurrency:
   group: results-ingest
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   ingest:
