@@ -17,6 +17,7 @@ export const loadPreds = (...a) => backend.loadPreds(...a);
 export const loadUserPreds = (...a) => backend.loadUserPreds(...a);
 export const loadAllUsers = (...a) => backend.loadAllUsers(...a);
 export const loadResults = (...a) => backend.loadResults(...a);
+export const watchResults = (...a) => backend.watchResults(...a);
 
 export const createLeague = (...a) => backend.createLeague(...a);
 export const findLeagueByCode = (...a) => backend.findLeagueByCode(...a);

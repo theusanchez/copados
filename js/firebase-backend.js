@@ -4,7 +4,7 @@ import {
   signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
-  getFirestore, doc, setDoc, updateDoc, getDocs, collection, query, where,
+  getFirestore, doc, setDoc, updateDoc, getDocs, onSnapshot, collection, query, where,
   arrayUnion, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
@@ -63,6 +63,17 @@ export function createFirebaseBackend() {
       const out = {};
       snap.forEach(d => { out[d.id] = d.data(); });
       return out;
+    },
+
+    // Real-time subscription to the results collection. Firestore pushes only
+    // changed docs (billed per changed doc, not per second), so this is both
+    // instant and far cheaper than polling. Returns an unsubscribe function.
+    watchResults(cb) {
+      return onSnapshot(collection(db, 'results'), snap => {
+        const out = {};
+        snap.forEach(d => { out[d.id] = d.data(); });
+        cb(out);
+      });
     },
 
     // --- Leagues ---

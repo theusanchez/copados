@@ -15,6 +15,16 @@ export function createFakeBackend() {
   const authListeners = [];
   const notify = () => authListeners.forEach(cb => cb(state.currentUser));
 
+  // Tests can simulate the ingester updating results by writing the `e2e_results`
+  // localStorage key; otherwise we return the seeded results.
+  const readResults = () => {
+    try {
+      const override = localStorage.getItem('e2e_results');
+      if (override) return JSON.parse(override);
+    } catch { /* ignore */ }
+    return structuredClone(state.results);
+  };
+
   return {
     loginWithGoogle: async () => {
       state.currentUser = seed.currentUser || state.users[0] || null;
@@ -39,13 +49,20 @@ export function createFakeBackend() {
     async loadUserPreds(uid) { return structuredClone(state.predictions[uid] || {}); },
     async loadAllUsers() { return structuredClone(state.users); },
     async loadResults() {
-      // Tests can simulate the ingester updating live results between polls by
-      // writing to this key; otherwise return the seeded results.
-      try {
-        const override = localStorage.getItem('e2e_results');
-        if (override) return JSON.parse(override);
-      } catch { /* ignore */ }
-      return structuredClone(state.results);
+      return readResults();
+    },
+
+    // Mirrors the real onSnapshot: emit current results, then re-emit whenever the
+    // test-only `e2e_results` override changes (simulating the ingester writing).
+    watchResults(cb) {
+      cb(readResults());
+      let last = JSON.stringify(readResults());
+      const iv = setInterval(() => {
+        const cur = readResults();
+        const sig = JSON.stringify(cur);
+        if (sig !== last) { last = sig; cb(cur); }
+      }, 400);
+      return () => clearInterval(iv);
     },
 
     // --- Leagues ---

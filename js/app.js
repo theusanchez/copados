@@ -1,4 +1,4 @@
-import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
+import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
 import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, groupsComplete, bestStreak, perfectGroups, isNostradamus } from './engine.js';
 
@@ -12,6 +12,7 @@ let currentUserKo = {};     // resolved knockout for `predictions` (set before e
 let koFillLocked = true;     // true while the group stage is incomplete (blocks knockout filling)
 let userLeagues = [];       // private leagues the current user belongs to
 let activeLeagueId = 'geral'; // 'geral' = everyone; otherwise a private league id
+let unsubscribeResults = null; // active Firestore results listener, if any
 
 const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
 
@@ -161,10 +162,15 @@ onAuthChange(async user => {
     renderProgress();
     renderGroupsView();
     renderKnockoutView();
+
+    // Subscribe to live result updates (replaces any prior subscription).
+    if (unsubscribeResults) unsubscribeResults();
+    unsubscribeResults = watchResults(applyResultsUpdate);
   } else {
     currentUser = null;
     predictions = {};
     userLeagues = [];
+    if (unsubscribeResults) { unsubscribeResults(); unsubscribeResults = null; }
     showLogin();
   }
 });
@@ -759,34 +765,37 @@ function renderFixtureCard(it) {
     </div>`;
 }
 
-// A compact signature of the mutable result fields (status + scoreline), so we can
-// tell when a poll actually brought something new.
+// A compact signature of the mutable result fields (status + scoreline), so we only
+// re-render when a snapshot actually changed something the UI shows.
 function resultsSignature(r) {
   return Object.keys(r).sort()
     .map(id => `${id}:${r[id].status}:${r[id].home}:${r[id].away}`)
     .join('|');
 }
 
-// Once a minute: pull fresh results so live scores/badges and finished results show
-// up without a manual reload. The fixtures view also re-renders to tick its lock
-// countdowns. Groups/knockout keep their sub-tab state, so they refresh on reentry.
-async function pollLiveResults() {
-  if (!currentUser) return;
+// Live results arrive via a Firestore real-time listener (watchResults): instant
+// updates, billed per changed doc, so live scores/badges and finished results show
+// up without a reload and without polling cost. Groups/knockout keep their sub-tab
+// state, so they refresh on reentry; the fixtures view updates in place.
+function applyResultsUpdate(fresh) {
+  const changed = resultsSignature(fresh) !== resultsSignature(results);
+  results = fresh;
+  if (!changed) return;
   // Never rebuild a card the user is currently typing into.
   if (document.activeElement?.classList?.contains('score-input')) return;
-
-  let fresh;
-  try { fresh = await loadResults(); } catch { return; }
-  const changed = resultsSignature(fresh) !== resultsSignature(results);
-  if (changed) results = fresh;
-
   const active = document.querySelector('.nav-tab.active')?.dataset.view;
   if (active === 'fixtures') renderFixturesView();
-  else if (changed && active === 'ranking') renderRankingView();
-  else if (changed && active === 'compare') renderCompareView();
+  else if (active === 'ranking') renderRankingView();
+  else if (active === 'compare') renderCompareView();
 }
 
-setInterval(pollLiveResults, 60000);
+// Tick the fixtures lock countdowns once a minute (time-based, no data fetch).
+setInterval(() => {
+  const v = document.getElementById('view-fixtures');
+  if (v && !v.classList.contains('hidden') && !v.contains(document.activeElement)) {
+    renderFixturesView();
+  }
+}, 60000);
 
 // -----------------------------------------------------------------------
 // Compare view
