@@ -337,10 +337,12 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
     : null;
   const resultClass = pts == null ? ''
     : pts === 5 ? ' result-exact' : pts === 3 ? ' result-partial' : ' result-miss';
+  const isLive = r?.status === 'live';
   const kickoff = formatKickoff(r?.kickoff);
-  const kickoffHtml = kickoff
-    ? `<div class="match-kickoff"><span aria-hidden="true">🕑</span> ${kickoff}</div>`
-    : '';
+  // While a match is live, the live score replaces the kickoff time on the card.
+  const headerHtml = isLive
+    ? renderLiveScore(r, isKnockout)
+    : (kickoff ? `<div class="match-kickoff"><span aria-hidden="true">🕑</span> ${kickoff}</div>` : '');
 
   let penHtml = '';
   if (isKnockout) {
@@ -366,8 +368,8 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   }
 
   return `
-    <div class="match-card${locked ? ' locked' : ''}${resultClass}" id="match-${match.id}">
-      ${kickoffHtml}
+    <div class="match-card${locked ? ' locked' : ''}${isLive ? ' live' : ''}${resultClass}" id="match-${match.id}">
+      ${headerHtml}
       <div class="match-body">
         <div class="team home-team">
           <span class="team-name">${hTeam}</span>
@@ -389,6 +391,19 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
       </div>
       ${penHtml}
       ${renderMatchResult(r, isKnockout, pts)}
+    </div>`;
+}
+
+// Live scoreline, shown on the card while a match is in progress.
+function renderLiveScore(r, isKnockout) {
+  const h = r.home ?? 0, a = r.away ?? 0;
+  const score = isKnockout
+    ? `${flag(r.homeTeam)} ${r.homeTeam} ${h} × ${a} ${r.awayTeam} ${flag(r.awayTeam)}`
+    : `${h} × ${a}`;
+  return `<div class="match-live">
+      <span class="live-dot" aria-hidden="true"></span>
+      <span class="live-label">AO VIVO</span>
+      <span class="live-score">${score}</span>
     </div>`;
 }
 

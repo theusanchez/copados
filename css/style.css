@@ -360,6 +360,50 @@ main {
   text-transform: capitalize;
 }
 
+.match-card.live {
+  border-color: var(--red);
+}
+
+.match-live {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem 0;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+.live-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--red);
+}
+
+.live-score {
+  font-weight: 600;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
 .match-body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
