@@ -88,14 +88,26 @@ async function main() {
   if (!res.ok) throw new Error(`football-data.org ${res.status}: ${await res.text()}`);
   const { matches = [] } = await res.json();
 
-  // Diagnostic: surface the raw API status for in-play/halftime matches so we can
-  // confirm whether football-data.org actually reports PAUSED (visible in the
-  // Actions run logs).
+  // Diagnostic: surface what this token's tier actually returns (many fields are
+  // null on the free tier). Visible in the Actions run logs.
   const liveApi = matches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED');
   if (liveApi.length) {
     console.log('Live per API: ' + liveApi
       .map(m => `${m.homeTeam?.name} x ${m.awayTeam?.name} [${m.status}${m.minute != null ? ' ' + m.minute + "'" : ''}]`)
       .join(' | '));
+  }
+  const sample = liveApi[0] || matches[0];
+  if (sample) {
+    console.log('Sample match keys: ' + Object.keys(sample).join(', '));
+    console.log('Sample fields: ' + JSON.stringify({
+      venue: sample.venue,
+      minute: sample.minute,
+      injuryTime: sample.injuryTime,
+      attendance: sample.attendance,
+      area: sample.area?.name,
+      halfTime: sample.score?.halfTime,
+      referees: Array.isArray(sample.referees) ? sample.referees.length : sample.referees,
+    }));
   }
 
   const docs = {};       // appMatchId -> result doc
