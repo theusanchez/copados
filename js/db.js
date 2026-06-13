@@ -1,69 +1,25 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import {
-  initializeAuth, browserLocalPersistence, browserPopupRedirectResolver,
-  signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged,
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore, doc, setDoc, getDocs, collection, serverTimestamp }
-  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-import { firebaseConfig } from './config.js';
+// Backend facade. Selects the real Firebase backend, or an in-memory fake when
+// the app is loaded with ?e2e=1 (used by the Playwright E2E suite). The rest of
+// the app imports only from here and is unaware of which backend is live.
+const E2E = typeof location !== 'undefined' &&
+  new URLSearchParams(location.search).has('e2e');
 
-const app = initializeApp(firebaseConfig);
-export const auth = initializeAuth(app, {
-  persistence: browserLocalPersistence,
-  popupRedirectResolver: browserPopupRedirectResolver,
-});
-export const db = getFirestore(app);
+const backend = E2E
+  ? (await import('./fake-backend.js')).createFakeBackend()
+  : (await import('./firebase-backend.js')).createFirebaseBackend();
 
-const provider = new GoogleAuthProvider();
+export const loginWithGoogle = (...a) => backend.loginWithGoogle(...a);
+export const logout = (...a) => backend.logout(...a);
+export const onAuthChange = (...a) => backend.onAuthChange(...a);
+export const saveUser = (...a) => backend.saveUser(...a);
+export const savePred = (...a) => backend.savePred(...a);
+export const loadPreds = (...a) => backend.loadPreds(...a);
+export const loadUserPreds = (...a) => backend.loadUserPreds(...a);
+export const loadAllUsers = (...a) => backend.loadAllUsers(...a);
+export const loadResults = (...a) => backend.loadResults(...a);
 
-export const loginWithGoogle = () =>
-  signInWithPopup(auth, provider, browserPopupRedirectResolver);
-export const logout = () => signOut(auth);
-export const onAuthChange = cb => onAuthStateChanged(auth, cb);
-
-export async function saveUser(user) {
-  await setDoc(doc(db, 'users', user.uid), {
-    uid: user.uid,
-    displayName: user.displayName,
-    email: user.email,
-    photoURL: user.photoURL,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
-}
-
-// Save a single prediction { home: N, away: N } (plus penWinner for knockout)
-export async function savePred(uid, matchId, data) {
-  await setDoc(doc(db, 'predictions', uid, 'matches', matchId), {
-    ...data,
-    updatedAt: serverTimestamp(),
-  }, { merge: true });
-}
-
-// Load all predictions for a user: returns { matchId: {home,away,...} }
-export async function loadPreds(uid) {
-  const snap = await getDocs(collection(db, 'predictions', uid, 'matches'));
-  const out = {};
-  snap.forEach(d => { out[d.id] = d.data(); });
-  return out;
-}
-
-// Load all users
-export async function loadAllUsers() {
-  const snap = await getDocs(collection(db, 'users'));
-  const users = [];
-  snap.forEach(d => users.push(d.data()));
-  return users;
-}
-
-// Load predictions for a specific user (read-only, for compare view)
-export async function loadUserPreds(uid) {
-  return loadPreds(uid);
-}
-
-// Load actual match results written by the results Cloud Function: { matchId: {...} }
-export async function loadResults() {
-  const snap = await getDocs(collection(db, 'results'));
-  const out = {};
-  snap.forEach(d => { out[d.id] = d.data(); });
-  return out;
-}
+export const createLeague = (...a) => backend.createLeague(...a);
+export const findLeagueByCode = (...a) => backend.findLeagueByCode(...a);
+export const joinLeague = (...a) => backend.joinLeague(...a);
+export const loadUserLeagues = (...a) => backend.loadUserLeagues(...a);
+export const getLeague = (...a) => backend.getLeague(...a);

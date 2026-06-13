@@ -141,7 +141,8 @@
 
     <script type="module" src="js/app.js"></script>
     <script>
-      if ("serviceWorker" in navigator) {
+      const __E2E__ = new URLSearchParams(location.search).has("e2e");
+      if ("serviceWorker" in navigator && !__E2E__) {
         window.addEventListener("load", () => {
           navigator.serviceWorker.register("sw.js").catch(() => {});
         });
