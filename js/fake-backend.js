@@ -38,7 +38,15 @@ export function createFakeBackend() {
     async loadPreds(uid) { return structuredClone(state.predictions[uid] || {}); },
     async loadUserPreds(uid) { return structuredClone(state.predictions[uid] || {}); },
     async loadAllUsers() { return structuredClone(state.users); },
-    async loadResults() { return structuredClone(state.results); },
+    async loadResults() {
+      // Tests can simulate the ingester updating live results between polls by
+      // writing to this key; otherwise return the seeded results.
+      try {
+        const override = localStorage.getItem('e2e_results');
+        if (override) return JSON.parse(override);
+      } catch { /* ignore */ }
+      return structuredClone(state.results);
+    },
 
     // --- Leagues ---
     async createLeague(league) { state.leagues.push(structuredClone(league)); },

@@ -759,13 +759,34 @@ function renderFixtureCard(it) {
     </div>`;
 }
 
-// Refresh countdowns once a minute while the fixtures view is open and idle.
-setInterval(() => {
-  const v = document.getElementById('view-fixtures');
-  if (v && !v.classList.contains('hidden') && !v.contains(document.activeElement)) {
-    renderFixturesView();
-  }
-}, 60000);
+// A compact signature of the mutable result fields (status + scoreline), so we can
+// tell when a poll actually brought something new.
+function resultsSignature(r) {
+  return Object.keys(r).sort()
+    .map(id => `${id}:${r[id].status}:${r[id].home}:${r[id].away}`)
+    .join('|');
+}
+
+// Once a minute: pull fresh results so live scores/badges and finished results show
+// up without a manual reload. The fixtures view also re-renders to tick its lock
+// countdowns. Groups/knockout keep their sub-tab state, so they refresh on reentry.
+async function pollLiveResults() {
+  if (!currentUser) return;
+  // Never rebuild a card the user is currently typing into.
+  if (document.activeElement?.classList?.contains('score-input')) return;
+
+  let fresh;
+  try { fresh = await loadResults(); } catch { return; }
+  const changed = resultsSignature(fresh) !== resultsSignature(results);
+  if (changed) results = fresh;
+
+  const active = document.querySelector('.nav-tab.active')?.dataset.view;
+  if (active === 'fixtures') renderFixturesView();
+  else if (changed && active === 'ranking') renderRankingView();
+  else if (changed && active === 'compare') renderCompareView();
+}
+
+setInterval(pollLiveResults, 60000);
 
 // -----------------------------------------------------------------------
 // Compare view
