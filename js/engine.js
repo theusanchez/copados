@@ -177,3 +177,64 @@ export function scoreUser(preds, results) {
   });
   return { total, exact, correct };
 }
+
+// -----------------------------------------------------------------------
+// Achievements / badges (intrinsic to one user's preds + the real results)
+// -----------------------------------------------------------------------
+const kms = k => (typeof k?.toMillis === 'function' ? k.toMillis() : Number(k)) || 0;
+
+function isFinished(r) {
+  return r && r.status === 'finished' && r.home != null && r.away != null;
+}
+
+function winnerOf(home, away, homeTeam, awayTeam, penWinner) {
+  const h = Number(home), a = Number(away);
+  if (isNaN(h) || isNaN(a)) return null;
+  if (h > a) return homeTeam;
+  if (a > h) return awayTeam;
+  return penWinner || null;
+}
+
+// The champion a user is predicting (null until they've filled the final).
+export function predictedChampion(preds) {
+  const f = resolveKnockout(preds)['FINAL'];
+  if (!f || f.home == null || f.away == null) return null;
+  return winnerOf(f.home, f.away, f.homeTeam, f.awayTeam, f.penWinner);
+}
+
+// The real champion (null until the final is finished).
+export function actualChampion(results) {
+  const f = results['FINAL'];
+  if (!isFinished(f)) return null;
+  return winnerOf(f.home, f.away, f.homeTeam, f.awayTeam, f.penWinner);
+}
+
+export function isNostradamus(preds, results) {
+  const actual = actualChampion(results);
+  return actual != null && predictedChampion(preds) === actual;
+}
+
+// Longest run of consecutive finished matches (in kickoff order) the user scored on.
+export function bestStreak(preds, results) {
+  const ko = resolveKnockout(preds);
+  const finished = Object.keys(results)
+    .filter(id => isFinished(results[id]))
+    .sort((a, b) => kms(results[a].kickoff) - kms(results[b].kickoff) || a.localeCompare(b));
+  let best = 0, cur = 0;
+  finished.forEach(id => {
+    if (matchPoints(id, preds, ko, results) >= 3) { cur++; best = Math.max(best, cur); }
+    else cur = 0;
+  });
+  return best;
+}
+
+// How many groups the user got fully right (all 6 matches finished and scored ≥3).
+export function perfectGroups(preds, results) {
+  const ko = resolveKnockout(preds);
+  let count = 0;
+  Object.values(GROUPS).forEach(g => {
+    const allFinished = g.matches.every(m => isFinished(results[m.id]));
+    if (allFinished && g.matches.every(m => matchPoints(m.id, preds, ko, results) >= 3)) count++;
+  });
+  return count;
+}

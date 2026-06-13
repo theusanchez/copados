@@ -1,6 +1,6 @@
 import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
-import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, groupsComplete } from './engine.js';
+import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, groupsComplete, bestStreak, perfectGroups, isNostradamus } from './engine.js';
 
 // -----------------------------------------------------------------------
 // State
@@ -1142,6 +1142,20 @@ function movementChip(e, hasPrev) {
   return '<span class="rank-move rank-move-flat" aria-label="manteve">–</span>';
 }
 
+// Achievement chips for a ranking entry. `isLeader`/`isRoundTop` are league-relative.
+function badgesFor(e, isLeader, isRoundTop) {
+  const badges = [];
+  if (isLeader) badges.push(['👑', 'Líder da liga']);
+  if (isRoundTop) badges.push(['🎯', 'Mais cravadas na rodada']);
+  if (e.streak >= 3) badges.push(['🔥', `Em chamas — ${e.streak} acertos seguidos`]);
+  if (e.perfect > 0) badges.push(['✅', `Grupo perfeito${e.perfect > 1 ? ` ×${e.perfect}` : ''}`]);
+  if (e.nostradamus) badges.push(['🔮', 'Nostradamus — cravou o campeão']);
+  if (!badges.length) return '';
+  return `<span class="ranking-badges">${badges
+    .map(([icon, label]) => `<span class="ach-badge" title="${label}" aria-label="${label}">${icon}</span>`)
+    .join('')}</span>`;
+}
+
 async function renderRankingView() {
   const container = document.getElementById('view-ranking');
   container.innerHTML = '<p class="loading-msg">Carregando...</p>';
@@ -1164,8 +1178,16 @@ async function renderRankingView() {
   const entries = users.map(u => {
     const cur = scoreUser(preds[u.uid], results);
     const prev = prevResults ? scoreUser(preds[u.uid], prevResults) : null;
-    return { user: u, ...cur, prev, prevTotal: prev ? prev.total : 0 };
+    return {
+      user: u, ...cur, prev, prevTotal: prev ? prev.total : 0,
+      roundExact: cur.exact - (prev ? prev.exact : 0),
+      streak: bestStreak(preds[u.uid], results),
+      perfect: perfectGroups(preds[u.uid], results),
+      nostradamus: isNostradamus(preds[u.uid], results),
+    };
   });
+
+  const maxRoundExact = Math.max(0, ...entries.map(e => e.roundExact));
 
   const curOrder = [...entries].sort((a, b) =>
     b.total - a.total || b.exact - a.exact || b.correct - a.correct || nameCmp(a, b));
@@ -1183,6 +1205,8 @@ async function renderRankingView() {
     const roundPts = e.total - e.prevTotal;
     const roundBadge = hasResults && roundPts > 0
       ? `<span class="ranking-round-pts">+${roundPts}</span>` : '';
+    const isLeader = hasResults && e.pos === 1 && e.total > 0;
+    const isRoundTop = hasResults && maxRoundExact > 0 && e.roundExact === maxRoundExact;
     return `
       <div class="ranking-row${isMe ? ' ranking-row-me' : ''}">
         <span class="ranking-pos">${e.pos}</span>
@@ -1191,6 +1215,7 @@ async function renderRankingView() {
         <div class="ranking-info">
           <span class="ranking-name">${e.user.displayName}${isMe ? ' (eu)' : ''}</span>
           <span class="ranking-stats">${e.exact} cravadas · ${e.correct} resultados</span>
+          ${badgesFor(e, isLeader, isRoundTop)}
         </div>
         <span class="ranking-points">${roundBadge}<span class="ranking-total">${e.total}<small>pts</small></span></span>
       </div>`;

@@ -1353,6 +1353,16 @@ main {
   font-size: 0.72rem;
   color: var(--subtext);
 }
+.ranking-badges {
+  display: flex;
+  gap: 0.15rem;
+  margin-top: 0.2rem;
+}
+.ach-badge {
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: default;
+}
 .ranking-points {
   display: flex;
   flex-direction: column;
