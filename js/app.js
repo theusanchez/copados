@@ -95,6 +95,41 @@ function predsComplete(preds) {
     Object.values(KNOCKOUT).flat().every(filled);
 }
 
+// Count how many group/knockout matches have a full scoreline, for the progress bar.
+function countFilled(preds) {
+  const filled = m => {
+    const p = preds[m.id];
+    return p && p.home != null && p.away != null;
+  };
+  const groups = Object.values(GROUPS).flatMap(g => g.matches);
+  const kos = Object.values(KNOCKOUT).flat();
+  return {
+    group: groups.filter(filled).length, groupTotal: groups.length,
+    ko: kos.filter(filled).length, koTotal: kos.length,
+  };
+}
+
+function renderProgress() {
+  const el = document.getElementById('progress-tracker');
+  if (!el) return;
+  const c = countFilled(predictions);
+  const done = c.group + c.ko;
+  const total = c.groupTotal + c.koTotal;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const complete = done === total;
+  el.classList.remove('hidden');
+  el.classList.toggle('complete', complete);
+  el.innerHTML = complete
+    ? `<div class="progress-row"><span class="progress-msg">✓ Bolão completo — boa sorte!</span></div>`
+    : `<div class="progress-row">
+        <span class="progress-msg">Faltam <strong>${total - done}</strong> de ${total} palpites</span>
+        <span class="progress-detail">Grupos ${c.group}/${c.groupTotal} · Mata-mata ${c.ko}/${c.koTotal}</span>
+      </div>
+      <div class="progress-track" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-fill" style="width:${pct}%"></div>
+      </div>`;
+}
+
 function recomputeAll() {
   const adv = computeAdvancing(predictions);
   const koResults = {};
@@ -117,6 +152,7 @@ onAuthChange(async user => {
     [predictions, results] = await Promise.all([loadPreds(user.uid), loadResults()]);
     showApp();
     renderUserInfo();
+    renderProgress();
     renderGroupsView();
     renderKnockoutView();
   } else {
@@ -190,6 +226,7 @@ async function savePrediction(matchId, field, value) {
   if (!predictions[matchId]) predictions[matchId] = {};
   predictions[matchId][field] = value === '' ? null : Number(value);
   await savePred(currentUser.uid, matchId, predictions[matchId]);
+  renderProgress();
   // Rerender live standings for group stage
   const groupKey = Object.keys(GROUPS).find(g =>
     GROUPS[g].matches.some(m => m.id === matchId)
