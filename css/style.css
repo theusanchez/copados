@@ -349,6 +349,17 @@ main {
   border-color: var(--subtext);
 }
 
+.match-kickoff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.4rem 1rem 0;
+  font-size: 0.75rem;
+  color: var(--subtext);
+  text-transform: capitalize;
+}
+
 .match-body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

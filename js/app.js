@@ -22,6 +22,26 @@ function flag(team) {
   return `<img class="flag-icon" src="https://flagcdn.com/${code}.svg" alt="" loading="lazy">`;
 }
 
+// Kickoff is stored as an absolute instant (UTC). Normalize Firestore Timestamp
+// or epoch-ms to a number, then always show it in Brazil time.
+function kickoffMs(kickoff) {
+  if (kickoff == null) return null;
+  const ms = typeof kickoff?.toMillis === 'function' ? kickoff.toMillis() : Number(kickoff);
+  return isNaN(ms) ? null : ms;
+}
+
+const KICKOFF_FMT = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  weekday: 'short', day: '2-digit', month: 'short',
+  hour: '2-digit', minute: '2-digit',
+});
+
+function formatKickoff(kickoff) {
+  const ms = kickoffMs(kickoff);
+  if (ms == null) return '';
+  return KICKOFF_FMT.format(new Date(ms)).replace(/\./g, '');
+}
+
 // Google/Firebase avatars 403 when a Referer is sent — no-referrer + initials fallback.
 function avatarHtml(user, cls) {
   const initial = user.displayName?.[0] || '?';
@@ -49,10 +69,8 @@ function isMatchLocked(matchId) {
   const r = results[matchId];
   if (!r) return false;
   if (r.status === 'live' || r.status === 'finished') return true;
-  if (r.kickoff != null) {
-    const ms = typeof r.kickoff?.toMillis === 'function' ? r.kickoff.toMillis() : Number(r.kickoff);
-    if (!isNaN(ms) && Date.now() >= ms) return true;
-  }
+  const ms = kickoffMs(r.kickoff);
+  if (ms != null && Date.now() >= ms) return true;
   return false;
 }
 
@@ -282,6 +300,10 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
     : null;
   const resultClass = pts == null ? ''
     : pts === 5 ? ' result-exact' : pts === 3 ? ' result-partial' : ' result-miss';
+  const kickoff = formatKickoff(r?.kickoff);
+  const kickoffHtml = kickoff
+    ? `<div class="match-kickoff"><span aria-hidden="true">🕑</span> ${kickoff}</div>`
+    : '';
 
   let penHtml = '';
   if (isKnockout) {
@@ -308,6 +330,7 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
 
   return `
     <div class="match-card${locked ? ' locked' : ''}${resultClass}" id="match-${match.id}">
+      ${kickoffHtml}
       <div class="match-body">
         <div class="team home-team">
           <span class="team-name">${hTeam}</span>
