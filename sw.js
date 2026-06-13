@@ -2,7 +2,7 @@
 // Goal: make the app installable and fast on repeat loads. Firebase calls always
 // hit the network (auth/Firestore are dynamic), so we only manage same-origin GETs.
 
-const VERSION = 'v8';
+const VERSION = 'v9';
 const CACHE = `copados-${VERSION}`;
 
 // App shell — resolved relative to the SW location (repo root), so it works under
@@ -46,21 +46,27 @@ self.addEventListener('fetch', event => {
   // Only handle our own origin; let Firebase/CDN requests pass straight through.
   if (url.origin !== self.location.origin) return;
 
-  // Navigations: network-first so deploys are picked up, fall back to cached shell offline.
-  if (req.mode === 'navigate') {
+  // App shell (HTML navigations + our own JS/CSS): network-first so a new deploy is
+  // picked up immediately and the HTML never runs against stale code. Falls back to
+  // cache when offline. This avoids the "new HTML + old app.js" mismatch on deploys.
+  const isCode = url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
+  if (req.mode === 'navigate' || isCode) {
+    const cacheKey = req.mode === 'navigate' ? 'index.html' : req;
     event.respondWith(
       fetch(req)
         .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put('index.html', copy));
+          if (res && res.status === 200) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(cacheKey, copy));
+          }
           return res;
         })
-        .catch(() => caches.match('index.html').then(r => r || caches.match('.')))
+        .catch(() => caches.match(cacheKey).then(r => r || caches.match('.')))
     );
     return;
   }
 
-  // Static assets: stale-while-revalidate.
+  // Other static assets (icons, etc.): stale-while-revalidate.
   event.respondWith(
     caches.match(req).then(cached => {
       const network = fetch(req).then(res => {
