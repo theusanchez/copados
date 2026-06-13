@@ -1,6 +1,6 @@
 import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults } from './db.js';
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
-import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints } from './engine.js';
+import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, groupsComplete } from './engine.js';
 
 // -----------------------------------------------------------------------
 // State
@@ -9,6 +9,9 @@ let currentUser = null;
 let predictions = {};       // { matchId: { home, away, penWinner? } }
 let results = {};           // { matchId: { home, away, status, kickoff, ... } } actual results
 let currentUserKo = {};     // resolved knockout for `predictions` (set before each render)
+let koFillLocked = true;     // true while the group stage is incomplete (blocks knockout filling)
+
+const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -165,6 +168,7 @@ function renderUserInfo() {
 // -----------------------------------------------------------------------
 async function savePrediction(matchId, field, value) {
   if (!currentUser || isMatchLocked(matchId)) return;
+  if (KNOCKOUT_IDS.has(matchId) && !groupsComplete(predictions)) return;
   if (!predictions[matchId]) predictions[matchId] = {};
   predictions[matchId][field] = value === '' ? null : Number(value);
   await savePred(currentUser.uid, matchId, predictions[matchId]);
@@ -174,7 +178,10 @@ async function savePrediction(matchId, field, value) {
   );
   if (groupKey) {
     renderGroupStandings(groupKey);
-    refreshKnockoutTeams();
+    // If this save flipped group-stage completion, re-render the knockout to
+    // (un)lock its inputs; otherwise just refresh the resolved team names.
+    if (groupsComplete(predictions) === koFillLocked) renderKnockoutView();
+    else refreshKnockoutTeams();
   } else {
     refreshKnockoutTeams();
   }
@@ -182,6 +189,7 @@ async function savePrediction(matchId, field, value) {
 
 async function savePenWinner(matchId, team) {
   if (!currentUser || isMatchLocked(matchId)) return;
+  if (KNOCKOUT_IDS.has(matchId) && !groupsComplete(predictions)) return;
   if (!predictions[matchId]) predictions[matchId] = {};
   predictions[matchId].penWinner = team;
   await savePred(currentUser.uid, matchId, predictions[matchId]);
@@ -263,7 +271,10 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   const pred = predictions[match.id] || {};
   const hVal = pred.home != null ? pred.home : '';
   const aVal = pred.away != null ? pred.away : '';
-  const locked = isMatchLocked(match.id);
+  // Knockout filling is blocked until the group stage is complete (the bracket is
+  // still viewable so people can watch it take shape).
+  const koLocked = isKnockout && !groupsComplete(predictions);
+  const locked = isMatchLocked(match.id) || koLocked;
   const lockAttrs = locked ? 'readonly tabindex="-1"' : '';
   const r = results[match.id];
   const pts = r && r.status === 'finished' && r.home != null && r.away != null
@@ -400,6 +411,7 @@ function collectLivePreds(groupKey) {
 function renderKnockoutView() {
   const container = document.getElementById('view-knockout');
   currentUserKo = resolveKnockout(predictions);
+  koFillLocked = !groupsComplete(predictions);
   const rounds = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
 
   const tabsHtml = rounds.map((r, i) =>
@@ -410,7 +422,14 @@ function renderKnockoutView() {
     `<div class="ko-panel${i === 0 ? '' : ' hidden'}" id="ko-panel-${r}"></div>`
   ).join('');
 
+  const lockNotice = koFillLocked ? `
+    <div class="ko-locked-notice">
+      🔒 Complete a <strong>fase de grupos</strong> para preencher o mata-mata.
+      Por enquanto você pode acompanhar como o chaveamento está ficando.
+    </div>` : '';
+
   container.innerHTML = `
+    ${lockNotice}
     <div class="ko-tabs-wrapper">
       <div class="ko-tabs">${tabsHtml}</div>
     </div>
@@ -525,11 +544,14 @@ async function renderCompareView() {
   compareEntries = await Promise.all(users.map(async u => {
     const preds = await loadUserPreds(u.uid);
     const koMatches = resolveKnockout(preds);
+    // No champion until the group stage is complete — the bracket is otherwise
+    // resolved from partial standings and would show a bogus winner.
+    const champion = groupsComplete(preds) ? championOf(koMatches) : '?';
     return {
       user: u,
       preds,
       koMatches,
-      champion: championOf(koMatches),
+      champion,
       complete: predsComplete(preds),
     };
   }));
