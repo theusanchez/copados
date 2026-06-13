@@ -71,7 +71,7 @@ function attachAvatarFallback(root) {
 function isMatchLocked(matchId) {
   const r = results[matchId];
   if (!r) return false;
-  if (r.status === 'live' || r.status === 'finished') return true;
+  if (r.status === 'live' || r.status === 'paused' || r.status === 'finished') return true;
   const ms = kickoffMs(r.kickoff);
   if (ms != null && Date.now() >= ms) return true;
   return false;
@@ -356,10 +356,10 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
     : null;
   const resultClass = pts == null ? ''
     : pts === 5 ? ' result-exact' : pts === 3 ? ' result-partial' : ' result-miss';
-  const isLive = r?.status === 'live';
+  const live = isInPlay(r);
   const kickoff = formatKickoff(r?.kickoff);
-  // While a match is live, the live score replaces the kickoff time on the card.
-  const headerHtml = isLive
+  // While a match is in play (live or halftime), the live score replaces the kickoff.
+  const headerHtml = live
     ? renderLiveScore(r, isKnockout)
     : (kickoff ? `<div class="match-kickoff"><span aria-hidden="true">🕑</span> ${kickoff}</div>` : '');
 
@@ -387,7 +387,7 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   }
 
   return `
-    <div class="match-card${locked ? ' locked' : ''}${isLive ? ' live' : ''}${resultClass}" id="match-${match.id}">
+    <div class="match-card${locked ? ' locked' : ''}${live ? ' live' : ''}${r?.status === 'paused' ? ' paused' : ''}${resultClass}" id="match-${match.id}">
       ${headerHtml}
       <div class="match-body">
         <div class="team home-team">
@@ -413,17 +413,23 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
     </div>`;
 }
 
-// Live scoreline, shown on the card while a match is in progress.
+// Live scoreline, shown on the card while a match is in progress or at halftime.
 function renderLiveScore(r, isKnockout) {
+  const paused = r.status === 'paused';
   const h = r.home ?? 0, a = r.away ?? 0;
   const score = isKnockout
     ? `${flag(r.homeTeam)} ${r.homeTeam} ${h} × ${a} ${r.awayTeam} ${flag(r.awayTeam)}`
     : `${h} × ${a}`;
-  return `<div class="match-live">
+  return `<div class="match-live${paused ? ' paused' : ''}">
       <span class="live-dot" aria-hidden="true"></span>
-      <span class="live-label">AO VIVO</span>
+      <span class="live-label">${paused ? 'INTERVALO' : 'AO VIVO'}</span>
       <span class="live-score">${score}</span>
     </div>`;
+}
+
+// A match is "in play" (locked, showing a live scoreline) while live or at halftime.
+function isInPlay(r) {
+  return r?.status === 'live' || r?.status === 'paused';
 }
 
 // Real result + points earned, shown once a match is finished.
@@ -720,7 +726,7 @@ function renderFixtureCard(it) {
   const hVal = pred.home != null ? pred.home : '';
   const aVal = pred.away != null ? pred.away : '';
   const r = results[match.id];
-  const isLive = r?.status === 'live';
+  const live = isInPlay(r);
   const koLocked = isKnockout && !groupsComplete(predictions);
   const locked = isMatchLocked(match.id) || koLocked;
   const lockAttrs = locked ? 'readonly tabindex="-1"' : '';
@@ -731,7 +737,7 @@ function renderFixtureCard(it) {
     : pts === 5 ? ' result-exact' : pts === 3 ? ' result-partial' : ' result-miss';
 
   let topHtml;
-  if (isLive) {
+  if (live) {
     topHtml = renderLiveScore(r, isKnockout);
   } else {
     const cd = !locked ? countdownLabel(ms) : null;
@@ -740,7 +746,7 @@ function renderFixtureCard(it) {
   }
 
   return `
-    <div class="match-card fx-card${locked ? ' locked' : ''}${isLive ? ' live' : ''}${resultClass}" id="fx-match-${match.id}">
+    <div class="match-card fx-card${locked ? ' locked' : ''}${live ? ' live' : ''}${r?.status === 'paused' ? ' paused' : ''}${resultClass}" id="fx-match-${match.id}">
       ${topHtml}
       <div class="match-body">
         <div class="team home-team">

@@ -20,7 +20,8 @@ const ROUND_ORDER = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
 // --- helpers ---------------------------------------------------------------
 
 function mapStatus(s) {
-  if (s === 'IN_PLAY' || s === 'PAUSED') return 'live';
+  if (s === 'IN_PLAY') return 'live';
+  if (s === 'PAUSED') return 'paused'; // halftime / stoppage break
   if (s === 'FINISHED') return 'finished';
   return 'scheduled';
 }

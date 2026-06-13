@@ -369,6 +369,18 @@ main {
   border-color: var(--red);
 }
 
+/* Halftime: amber, steady (no pulse). */
+.match-card.paused {
+  border-color: var(--amber);
+}
+.match-live.paused .live-dot {
+  background: var(--amber);
+  animation: none;
+}
+.match-live.paused .live-label {
+  color: var(--amber);
+}
+
 .match-live {
   display: flex;
   align-items: center;
