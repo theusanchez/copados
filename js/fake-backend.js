@@ -53,9 +53,5 @@ export function createFakeBackend() {
     async loadUserLeagues(uid) {
       return structuredClone(state.leagues.filter(l => l.memberUids.includes(uid)));
     },
-    async getLeague(leagueId) {
-      const l = state.leagues.find(x => x.id === leagueId);
-      return l ? structuredClone(l) : null;
-    },
   };
 }

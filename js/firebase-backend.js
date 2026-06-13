@@ -4,7 +4,7 @@ import {
   signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, getDocs, collection, query, where,
+  getFirestore, doc, setDoc, updateDoc, getDocs, collection, query, where,
   arrayUnion, serverTimestamp,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
@@ -89,11 +89,6 @@ export function createFirebaseBackend() {
       const out = [];
       snap.forEach(d => out.push(d.data()));
       return out;
-    },
-
-    async getLeague(leagueId) {
-      const d = await getDoc(doc(db, 'leagues', leagueId));
-      return d.exists() ? d.data() : null;
     },
   };
 }

@@ -22,4 +22,3 @@ export const createLeague = (...a) => backend.createLeague(...a);
 export const findLeagueByCode = (...a) => backend.findLeagueByCode(...a);
 export const joinLeague = (...a) => backend.joinLeague(...a);
 export const loadUserLeagues = (...a) => backend.loadUserLeagues(...a);
-export const getLeague = (...a) => backend.getLeague(...a);

@@ -1,4 +1,4 @@
-import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults } from './db.js';
+import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
 import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, groupsComplete } from './engine.js';
 
@@ -10,6 +10,8 @@ let predictions = {};       // { matchId: { home, away, penWinner? } }
 let results = {};           // { matchId: { home, away, status, kickoff, ... } } actual results
 let currentUserKo = {};     // resolved knockout for `predictions` (set before each render)
 let koFillLocked = true;     // true while the group stage is incomplete (blocks knockout filling)
+let userLeagues = [];       // private leagues the current user belongs to
+let activeLeagueId = 'geral'; // 'geral' = everyone; otherwise a private league id
 
 const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
 
@@ -149,7 +151,11 @@ onAuthChange(async user => {
   if (user) {
     currentUser = user;
     await saveUser(user);
-    [predictions, results] = await Promise.all([loadPreds(user.uid), loadResults()]);
+    [predictions, results, userLeagues] = await Promise.all([
+      loadPreds(user.uid), loadResults(), loadUserLeagues(user.uid),
+    ]);
+    await consumeJoinLink();
+    restoreActiveLeague();
     showApp();
     renderUserInfo();
     renderProgress();
@@ -158,6 +164,7 @@ onAuthChange(async user => {
   } else {
     currentUser = null;
     predictions = {};
+    userLeagues = [];
     showLogin();
   }
 });
@@ -191,7 +198,7 @@ function showApp() {
 }
 
 function switchMainView(view) {
-  ['fixtures', 'groups', 'knockout', 'compare', 'ranking'].forEach(v => {
+  ['fixtures', 'groups', 'knockout', 'compare', 'ranking', 'leagues'].forEach(v => {
     document.getElementById(`view-${v}`).classList.toggle('hidden', v !== view);
   });
   document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -200,6 +207,7 @@ function switchMainView(view) {
   if (view === 'fixtures') renderFixturesView();
   if (view === 'compare') renderCompareView();
   if (view === 'ranking') renderRankingView();
+  if (view === 'leagues') renderLeaguesView();
 }
 
 document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -768,7 +776,7 @@ async function renderCompareView() {
   const container = document.getElementById('view-compare');
   container.innerHTML = '<p class="loading-msg">Carregando...</p>';
 
-  const users = await loadAllUsers();
+  const users = scopeUsers(await loadAllUsers());
   compareEntries = await Promise.all(users.map(async u => {
     const preds = await loadUserPreds(u.uid);
     const koMatches = resolveKnockout(preds);
@@ -795,13 +803,14 @@ async function renderCompareView() {
     </section>` : '';
 
   container.innerHTML = `
-    <div class="compare-header"><h2>Palpites dos participantes</h2></div>
+    <div class="compare-header"><h2>Palpites · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}</div>
     ${section('✓ Finalizados', complete)}
     ${section('⏳ Em andamento', incomplete)}
     <div id="compare-detail" class="compare-detail hidden"></div>
   `;
 
   attachAvatarFallback(container);
+  wireLeagueSwitcher(container, renderCompareView);
 
   container.querySelectorAll('.compare-card').forEach(card => {
     card.addEventListener('click', () => {
@@ -922,6 +931,182 @@ function renderComparison(me, them) {
 }
 
 // -----------------------------------------------------------------------
+// Leagues (private bolões)
+// -----------------------------------------------------------------------
+// Short, shareable codes that avoid easily-confused characters (0/O, 1/I).
+function generateCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return code;
+}
+
+function getActiveLeague() {
+  return userLeagues.find(l => l.id === activeLeagueId) || null;
+}
+
+function activeLeagueName() {
+  const l = getActiveLeague();
+  return l ? l.name : 'Geral';
+}
+
+// Scope ranking/compare to the active league's members; null = everyone.
+function scopeUsers(users) {
+  const l = getActiveLeague();
+  return l ? users.filter(u => l.memberUids.includes(u.uid)) : users;
+}
+
+function restoreActiveLeague() {
+  const saved = localStorage.getItem('active_league') || 'geral';
+  activeLeagueId = (saved === 'geral' || userLeagues.some(l => l.id === saved)) ? saved : 'geral';
+}
+
+function setActiveLeague(id) {
+  activeLeagueId = id;
+  localStorage.setItem('active_league', id);
+}
+
+// Auto-join a league when the app is opened with ?join=CODE.
+async function consumeJoinLink() {
+  const params = new URLSearchParams(location.search);
+  const code = params.get('join');
+  if (!code) return;
+  params.delete('join');
+  const qs = params.toString();
+  history.replaceState(null, '', location.pathname + (qs ? `?${qs}` : ''));
+  const league = await findLeagueByCode(code.toUpperCase());
+  if (!league) return;
+  if (!league.memberUids.includes(currentUser.uid)) {
+    await joinLeague(league.id, currentUser.uid);
+    league.memberUids.push(currentUser.uid);
+  }
+  if (!userLeagues.some(l => l.id === league.id)) userLeagues.push(league);
+  setActiveLeague(league.id);
+}
+
+function leagueSwitcherHtml() {
+  const opts = [{ id: 'geral', name: 'Geral' }, ...userLeagues]
+    .map(l => `<option value="${l.id}"${l.id === activeLeagueId ? ' selected' : ''}>${l.name}</option>`)
+    .join('');
+  return `<label class="league-switch">
+      <span class="league-switch-label">Liga:</span>
+      <select class="league-select" aria-label="Liga ativa">${opts}</select>
+    </label>`;
+}
+
+function wireLeagueSwitcher(root, onChange) {
+  const sel = root.querySelector('.league-select');
+  if (sel) sel.addEventListener('change', () => { setActiveLeague(sel.value); onChange(); });
+}
+
+function renderLeaguesView() {
+  const container = document.getElementById('view-leagues');
+  const inviteBase = location.origin + location.pathname;
+
+  const leagueCard = (l) => {
+    const isActive = l.id === activeLeagueId;
+    const link = `${inviteBase}?join=${l.code}`;
+    const count = l.memberUids.length;
+    return `<div class="league-card${isActive ? ' active' : ''}">
+        <div class="league-card-head">
+          <span class="league-card-name">${l.name}</span>
+          ${isActive
+            ? '<span class="league-badge">Ativa</span>'
+            : `<button class="league-activate" data-id="${l.id}" type="button">Ativar</button>`}
+        </div>
+        <div class="league-card-meta">
+          <span class="league-code">Código <strong>${l.code}</strong></span>
+          <span>${count} ${count === 1 ? 'membro' : 'membros'}</span>
+        </div>
+        <button class="league-copy" data-link="${link}" type="button">Copiar convite</button>
+      </div>`;
+  };
+
+  const geralActive = activeLeagueId === 'geral';
+  const geralCard = `<div class="league-card${geralActive ? ' active' : ''}">
+      <div class="league-card-head">
+        <span class="league-card-name">Geral</span>
+        ${geralActive
+          ? '<span class="league-badge">Ativa</span>'
+          : '<button class="league-activate" data-id="geral" type="button">Ativar</button>'}
+      </div>
+      <div class="league-card-meta"><span>Todos os participantes</span></div>
+    </div>`;
+
+  container.innerHTML = `
+    <div class="compare-header"><h2>Ligas</h2></div>
+    <p class="league-intro">Crie uma liga privada e compartilhe o convite — o ranking e a comparação passam a contar só entre os membros dela.</p>
+    <div class="league-list">
+      ${geralCard}
+      ${userLeagues.map(leagueCard).join('')}
+    </div>
+    <div class="league-actions">
+      <form class="league-form" id="form-create">
+        <input class="league-input" id="input-create" type="text" maxlength="30"
+          placeholder="Nome da nova liga" aria-label="Nome da nova liga" required>
+        <button class="league-btn" type="submit">Criar liga</button>
+      </form>
+      <form class="league-form" id="form-join">
+        <input class="league-input league-input-code" id="input-join" type="text" maxlength="6"
+          placeholder="Código do convite" aria-label="Código do convite" required>
+        <button class="league-btn" type="submit">Entrar</button>
+      </form>
+      <p class="league-msg" id="league-msg" aria-live="polite"></p>
+    </div>`;
+
+  container.querySelectorAll('.league-activate').forEach(btn => {
+    btn.addEventListener('click', () => { setActiveLeague(btn.dataset.id); renderLeaguesView(); });
+  });
+  container.querySelectorAll('.league-copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(btn.dataset.link); btn.textContent = 'Convite copiado!'; }
+      catch { btn.textContent = btn.dataset.link; }
+      setTimeout(() => { btn.textContent = 'Copiar convite'; }, 2000);
+    });
+  });
+  container.querySelector('#form-create').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = container.querySelector('#input-create').value.trim();
+    if (name) createLeagueFlow(name);
+  });
+  container.querySelector('#form-join').addEventListener('submit', e => {
+    e.preventDefault();
+    const code = container.querySelector('#input-join').value.trim().toUpperCase();
+    if (code) joinLeagueFlow(code);
+  });
+}
+
+async function createLeagueFlow(name) {
+  const league = {
+    id: crypto.randomUUID(),
+    name,
+    code: generateCode(),
+    ownerUid: currentUser.uid,
+    memberUids: [currentUser.uid],
+  };
+  await createLeague(league);
+  userLeagues.push(league);
+  setActiveLeague(league.id);
+  renderLeaguesView();
+}
+
+async function joinLeagueFlow(code) {
+  const msg = document.getElementById('league-msg');
+  if (userLeagues.some(l => l.code === code)) {
+    setActiveLeague(userLeagues.find(l => l.code === code).id);
+    renderLeaguesView();
+    return;
+  }
+  const league = await findLeagueByCode(code);
+  if (!league) { if (msg) msg.textContent = 'Liga não encontrada para esse código.'; return; }
+  await joinLeague(league.id, currentUser.uid);
+  if (!league.memberUids.includes(currentUser.uid)) league.memberUids.push(currentUser.uid);
+  userLeagues.push(league);
+  setActiveLeague(league.id);
+  renderLeaguesView();
+}
+
+// -----------------------------------------------------------------------
 // Ranking view
 // -----------------------------------------------------------------------
 async function renderRankingView() {
@@ -929,7 +1114,7 @@ async function renderRankingView() {
   container.innerHTML = '<p class="loading-msg">Carregando...</p>';
 
   const hasResults = Object.values(results).some(r => r.status === 'finished');
-  const users = await loadAllUsers();
+  const users = scopeUsers(await loadAllUsers());
   const rows = (await Promise.all(users.map(async u => {
     const preds = await loadUserPreds(u.uid);
     return { user: u, ...scoreUser(preds, results) };
@@ -956,10 +1141,11 @@ async function renderRankingView() {
     `<p class="ranking-empty">Os jogos ainda não começaram — o ranking aparece assim que os primeiros resultados saírem.</p>`;
 
   container.innerHTML = `
-    <div class="compare-header"><h2>Ranking</h2></div>
+    <div class="compare-header"><h2>Ranking · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}</div>
     ${empty}
     <div class="ranking-list">${rowsHtml}</div>
   `;
 
   attachAvatarFallback(container);
+  wireLeagueSwitcher(container, renderRankingView);
 }
