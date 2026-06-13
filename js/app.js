@@ -130,7 +130,7 @@ function showApp() {
   hideLoading();
   document.getElementById('view-login').classList.add('hidden');
   document.getElementById('view-app').classList.remove('hidden');
-  switchMainView('groups');
+  switchMainView(predsComplete(predictions) ? 'compare' : 'groups');
 }
 
 function switchMainView(view) {
@@ -265,6 +265,12 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   const aVal = pred.away != null ? pred.away : '';
   const locked = isMatchLocked(match.id);
   const lockAttrs = locked ? 'readonly tabindex="-1"' : '';
+  const r = results[match.id];
+  const pts = r && r.status === 'finished' && r.home != null && r.away != null
+    ? matchPoints(match.id, predictions, currentUserKo, results)
+    : null;
+  const resultClass = pts == null ? ''
+    : pts === 5 ? ' result-exact' : pts === 3 ? ' result-partial' : ' result-miss';
 
   let penHtml = '';
   if (isKnockout) {
@@ -290,7 +296,7 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   }
 
   return `
-    <div class="match-card${locked ? ' locked' : ''}" id="match-${match.id}">
+    <div class="match-card${locked ? ' locked' : ''}${resultClass}" id="match-${match.id}">
       <div class="match-body">
         <div class="team home-team">
           <span class="team-name">${hTeam}</span>
@@ -311,15 +317,13 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
         </div>
       </div>
       ${penHtml}
-      ${renderMatchResult(match.id, isKnockout)}
+      ${renderMatchResult(r, isKnockout, pts)}
     </div>`;
 }
 
 // Real result + points earned, shown once a match is finished.
-function renderMatchResult(matchId, isKnockout) {
-  const r = results[matchId];
-  if (!r || r.status !== 'finished' || r.home == null || r.away == null) return '';
-  const pts = matchPoints(matchId, predictions, currentUserKo, results);
+function renderMatchResult(r, isKnockout, pts) {
+  if (pts == null) return '';
   const ptsClass = pts === 5 ? 'pts-exact' : pts === 3 ? 'pts-partial' : 'pts-zero';
   const badge = `<span class="result-pts ${ptsClass}">+${pts}</span>`;
   const score = isKnockout

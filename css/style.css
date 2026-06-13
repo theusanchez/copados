@@ -921,12 +921,26 @@ main {
   background: var(--green);
 }
 .pts-partial {
-  color: #000;
-  background: var(--amber);
+  color: var(--green);
+  background: rgba(63, 185, 80, 0.2);
 }
 .pts-zero {
-  color: var(--subtext);
-  background: var(--border);
+  color: #fff;
+  background: var(--red);
+}
+
+/* Outcome tint on the whole card once a match is finished. */
+.match-card.result-exact {
+  background: rgba(63, 185, 80, 0.22);
+  border-color: var(--green);
+}
+.match-card.result-partial {
+  background: rgba(63, 185, 80, 0.1);
+  border-color: rgba(63, 185, 80, 0.5);
+}
+.match-card.result-miss {
+  background: rgba(248, 81, 73, 0.12);
+  border-color: rgba(248, 81, 73, 0.5);
 }
 
 /* ================================================================
