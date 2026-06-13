@@ -1,5 +1,6 @@
 import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
+import { venueLabel } from './venues.js';
 import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, groupsComplete, bestStreak, perfectGroups, isNostradamus } from './engine.js';
 
 // -----------------------------------------------------------------------
@@ -361,7 +362,8 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   // While a match is in play (live or halftime), the live score replaces the kickoff.
   const metaBits = [];
   if (kickoff) metaBits.push(`<span aria-hidden="true">🕑</span> ${kickoff}`);
-  if (r?.venue) metaBits.push(`🏟️ <span class="venue-name">${r.venue}</span>`);
+  const venue = venueLabel(match.id);
+  if (venue) metaBits.push(`🏟️ <span class="venue-name">${venue}</span>`);
   const headerHtml = live
     ? renderLiveScore(r, isKnockout)
     : (metaBits.length ? `<div class="match-kickoff">${metaBits.join(' · ')}</div>` : '');
@@ -745,7 +747,8 @@ function renderFixtureCard(it) {
   } else {
     const cd = !locked ? countdownLabel(ms) : null;
     const cdHtml = cd ? `<span class="fx-countdown">🔒 ${cd}</span>` : '';
-    const venueHtml = r?.venue ? `<span class="fx-venue">🏟️ ${r.venue}</span>` : '';
+    const venue = venueLabel(match.id);
+    const venueHtml = venue ? `<span class="fx-venue">🏟️ ${venue}</span>` : '';
     topHtml = `<div class="fx-meta"><span class="fx-time">🕑 ${formatKickoff(r?.kickoff)}</span>${cdHtml}${venueHtml}</div>`;
   }
 

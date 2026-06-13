@@ -46,11 +46,6 @@ test('kickoff compared by epoch across Timestamp shapes', () => {
   );
 });
 
-test('venue appearing for the first time is detected', () => {
-  assert.equal(resultChanged({ ...base }, { ...base, venue: 'MetLife Stadium' }), true);
-  assert.equal(resultChanged({ ...base, venue: 'MetLife Stadium' }, { ...base, venue: 'MetLife Stadium' }), false);
-});
-
 test('absent vs null fields treated equal', () => {
   const stored = { status: 'scheduled', home: null, away: null, homeTeam: 'Brasil', awayTeam: 'Marrocos', kickoff: 1000 };
   assert.equal(resultChanged(stored, base), false); // base adds penWinner: null

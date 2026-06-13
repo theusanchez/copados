@@ -51,7 +51,6 @@ function groupDoc(appMatch, m, homePt, awayPt) {
     homeTeam: appMatch.home,
     awayTeam: appMatch.away,
     kickoff: kickoffTs(m),
-    venue: m.venue ?? null,
   };
 }
 
@@ -65,7 +64,7 @@ function koDoc(m, homePt, awayPt) {
     if (m.score?.winner === 'HOME_TEAM') penWinner = homePt;
     else if (m.score?.winner === 'AWAY_TEAM') penWinner = awayPt;
   }
-  return { status, home, away, homeTeam: homePt, awayTeam: awayPt, kickoff: kickoffTs(m), penWinner, venue: m.venue ?? null };
+  return { status, home, away, homeTeam: homePt, awayTeam: awayPt, kickoff: kickoffTs(m), penWinner };
 }
 
 // --- credentials -----------------------------------------------------------
