@@ -191,12 +191,13 @@ function showApp() {
 }
 
 function switchMainView(view) {
-  ['groups', 'knockout', 'compare', 'ranking'].forEach(v => {
+  ['fixtures', 'groups', 'knockout', 'compare', 'ranking'].forEach(v => {
     document.getElementById(`view-${v}`).classList.toggle('hidden', v !== view);
   });
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.view === view);
   });
+  if (view === 'fixtures') renderFixturesView();
   if (view === 'compare') renderCompareView();
   if (view === 'ranking') renderRankingView();
 }
@@ -225,6 +226,10 @@ async function savePrediction(matchId, field, value) {
   if (KNOCKOUT_IDS.has(matchId) && !groupsComplete(predictions)) return;
   if (!predictions[matchId]) predictions[matchId] = {};
   predictions[matchId][field] = value === '' ? null : Number(value);
+  // The same match can be on screen in more than one view (groups/knockout/fixtures);
+  // keep their inputs in sync so an edit in one place is reflected everywhere.
+  document.querySelectorAll(`.score-input[data-match-id="${matchId}"][data-side="${field}"]`)
+    .forEach(inp => { if (inp.value !== value) inp.value = value; });
   await savePred(currentUser.uid, matchId, predictions[matchId]);
   renderProgress();
   // Rerender live standings for group stage
@@ -605,6 +610,154 @@ function refreshKnockoutTeams() {
     });
   });
 }
+
+// -----------------------------------------------------------------------
+// Fixtures view (chronological, "what's today / locking soon")
+// -----------------------------------------------------------------------
+const SP_DAY_KEY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+const SP_DAY_LABEL = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo', weekday: 'short', day: '2-digit', month: 'short',
+});
+
+function dayLabel(ms) {
+  const key = SP_DAY_KEY.format(new Date(ms));
+  const today = SP_DAY_KEY.format(new Date());
+  const tomorrow = SP_DAY_KEY.format(new Date(Date.now() + 86400000));
+  if (key === today) return 'Hoje';
+  if (key === tomorrow) return 'Amanhã';
+  return SP_DAY_LABEL.format(new Date(ms)).replace(/\./g, '');
+}
+
+// Time remaining until a match locks (kickoff). Null once it has started.
+function countdownLabel(ms) {
+  const diff = ms - Date.now();
+  if (diff <= 0) return null;
+  const mins = Math.floor(diff / 60000);
+  const d = Math.floor(mins / 1440);
+  const h = Math.floor((mins % 1440) / 60);
+  const mn = mins % 60;
+  if (d > 0) return `trava em ${d}d ${h}h`;
+  if (h > 0) return `trava em ${h}h ${mn}min`;
+  return `trava em ${mn}min`;
+}
+
+// Flat, kickoff-sorted fixture list. Only matches with a known kickoff appear —
+// the schedule comes from the ingested `results` docs, not from data.js.
+function fixtureList() {
+  const { koMatches } = recomputeAll();
+  const items = [];
+  Object.values(GROUPS).forEach(g => g.matches.forEach(m => {
+    const r = results[m.id];
+    items.push({ match: m, isKnockout: false, homeTeam: m.home, awayTeam: m.away, ms: kickoffMs(r?.kickoff) });
+  }));
+  Object.values(KNOCKOUT).flat().forEach(m => {
+    const r = results[m.id];
+    const km = koMatches[m.id];
+    items.push({
+      match: m, isKnockout: true,
+      homeTeam: r?.homeTeam || km.homeTeam, awayTeam: r?.awayTeam || km.awayTeam,
+      ms: kickoffMs(r?.kickoff),
+    });
+  });
+  return items.filter(i => i.ms != null).sort((a, b) => a.ms - b.ms);
+}
+
+function renderFixturesView() {
+  const container = document.getElementById('view-fixtures');
+  currentUserKo = resolveKnockout(predictions);
+  const items = fixtureList();
+
+  if (!items.length) {
+    container.innerHTML = `
+      <div class="compare-header"><h2>Jogos</h2></div>
+      <p class="ranking-empty">O calendário aparece aqui assim que os horários dos jogos forem publicados.</p>`;
+    return;
+  }
+
+  const buckets = [];
+  items.forEach(it => {
+    const label = dayLabel(it.ms);
+    let b = buckets[buckets.length - 1];
+    if (!b || b.label !== label) { b = { label, items: [] }; buckets.push(b); }
+    b.items.push(it);
+  });
+
+  container.innerHTML = `
+    <div class="compare-header"><h2>Jogos</h2></div>
+    ${buckets.map(b => `
+      <div class="fx-day">
+        <h3 class="fx-day-label">${b.label}</h3>
+        ${b.items.map(renderFixtureCard).join('')}
+      </div>`).join('')}`;
+
+  container.querySelectorAll('.score-input').forEach(input => {
+    input.addEventListener('blur', () => {
+      const { matchId, side } = input.dataset;
+      savePrediction(matchId, side, input.value);
+    });
+  });
+}
+
+function renderFixtureCard(it) {
+  const { match, isKnockout, homeTeam, awayTeam, ms } = it;
+  const pred = predictions[match.id] || {};
+  const hVal = pred.home != null ? pred.home : '';
+  const aVal = pred.away != null ? pred.away : '';
+  const r = results[match.id];
+  const isLive = r?.status === 'live';
+  const koLocked = isKnockout && !groupsComplete(predictions);
+  const locked = isMatchLocked(match.id) || koLocked;
+  const lockAttrs = locked ? 'readonly tabindex="-1"' : '';
+  const pts = r && r.status === 'finished' && r.home != null && r.away != null
+    ? matchPoints(match.id, predictions, currentUserKo, results)
+    : null;
+  const resultClass = pts == null ? ''
+    : pts === 5 ? ' result-exact' : pts === 3 ? ' result-partial' : ' result-miss';
+
+  let topHtml;
+  if (isLive) {
+    topHtml = renderLiveScore(r, isKnockout);
+  } else {
+    const cd = !locked ? countdownLabel(ms) : null;
+    const cdHtml = cd ? `<span class="fx-countdown">🔒 ${cd}</span>` : '';
+    topHtml = `<div class="fx-meta"><span class="fx-time">🕑 ${formatKickoff(r?.kickoff)}</span>${cdHtml}</div>`;
+  }
+
+  return `
+    <div class="match-card fx-card${locked ? ' locked' : ''}${isLive ? ' live' : ''}${resultClass}" id="fx-match-${match.id}">
+      ${topHtml}
+      <div class="match-body">
+        <div class="team home-team">
+          <span class="team-name">${homeTeam}</span>
+          <span class="team-flag">${flag(homeTeam)}</span>
+        </div>
+        <div class="score-area">
+          <input type="number" min="0" max="20" class="score-input"
+            data-match-id="${match.id}" data-side="home"
+            value="${hVal}" ${lockAttrs} aria-label="Placar ${homeTeam}">
+          <span class="score-sep">×</span>
+          <input type="number" min="0" max="20" class="score-input"
+            data-match-id="${match.id}" data-side="away"
+            value="${aVal}" ${lockAttrs} aria-label="Placar ${awayTeam}">
+        </div>
+        <div class="team away-team">
+          <span class="team-flag">${flag(awayTeam)}</span>
+          <span class="team-name">${awayTeam}</span>
+        </div>
+      </div>
+      ${pts != null ? renderMatchResult(r, isKnockout, pts) : ''}
+    </div>`;
+}
+
+// Refresh countdowns once a minute while the fixtures view is open and idle.
+setInterval(() => {
+  const v = document.getElementById('view-fixtures');
+  if (v && !v.classList.contains('hidden') && !v.contains(document.activeElement)) {
+    renderFixturesView();
+  }
+}, 60000);
 
 // -----------------------------------------------------------------------
 // Compare view

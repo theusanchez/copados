@@ -81,6 +81,9 @@
         <span class="header-logo" aria-label="Copa 2026">⚽ Copa 2026</span>
 
         <nav class="nav-tabs" role="navigation" aria-label="Seções principais">
+          <button class="nav-tab" data-view="fixtures" type="button">
+            Jogos
+          </button>
           <button class="nav-tab active" data-view="groups" type="button">
             Grupos
           </button>
@@ -115,6 +118,11 @@
           class="progress-tracker hidden"
           aria-live="polite"
         ></div>
+
+        <!-- Fixtures (chronological) view -->
+        <section id="view-fixtures" class="hidden" aria-label="Próximos jogos">
+          <!-- Rendered by app.js -->
+        </section>
 
         <!-- Groups view -->
         <section id="view-groups" aria-label="Fase de grupos">
