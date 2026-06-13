@@ -51,6 +51,7 @@ function groupDoc(appMatch, m, homePt, awayPt) {
     homeTeam: appMatch.home,
     awayTeam: appMatch.away,
     kickoff: kickoffTs(m),
+    venue: m.venue ?? null,
   };
 }
 
@@ -64,7 +65,7 @@ function koDoc(m, homePt, awayPt) {
     if (m.score?.winner === 'HOME_TEAM') penWinner = homePt;
     else if (m.score?.winner === 'AWAY_TEAM') penWinner = awayPt;
   }
-  return { status, home, away, homeTeam: homePt, awayTeam: awayPt, kickoff: kickoffTs(m), penWinner };
+  return { status, home, away, homeTeam: homePt, awayTeam: awayPt, kickoff: kickoffTs(m), penWinner, venue: m.venue ?? null };
 }
 
 // --- credentials -----------------------------------------------------------
@@ -88,26 +89,13 @@ async function main() {
   if (!res.ok) throw new Error(`football-data.org ${res.status}: ${await res.text()}`);
   const { matches = [] } = await res.json();
 
-  // Diagnostic: surface what this token's tier actually returns (many fields are
-  // null on the free tier). Visible in the Actions run logs.
+  // Diagnostic: raw API status for in-play matches, to confirm whether the source
+  // reports PAUSED (halftime). Visible in the Actions run logs.
   const liveApi = matches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED');
   if (liveApi.length) {
     console.log('Live per API: ' + liveApi
       .map(m => `${m.homeTeam?.name} x ${m.awayTeam?.name} [${m.status}${m.minute != null ? ' ' + m.minute + "'" : ''}]`)
       .join(' | '));
-  }
-  const sample = liveApi[0] || matches[0];
-  if (sample) {
-    console.log('Sample match keys: ' + Object.keys(sample).join(', '));
-    console.log('Sample fields: ' + JSON.stringify({
-      venue: sample.venue,
-      minute: sample.minute,
-      injuryTime: sample.injuryTime,
-      attendance: sample.attendance,
-      area: sample.area?.name,
-      halfTime: sample.score?.halfTime,
-      referees: Array.isArray(sample.referees) ? sample.referees.length : sample.referees,
-    }));
   }
 
   const docs = {};       // appMatchId -> result doc

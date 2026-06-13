@@ -12,7 +12,7 @@ export function tsMs(t) {
   return Number.isNaN(n) ? null : n;
 }
 
-const FIELDS = ['status', 'home', 'away', 'homeTeam', 'awayTeam', 'penWinner'];
+const FIELDS = ['status', 'home', 'away', 'homeTeam', 'awayTeam', 'penWinner', 'venue'];
 
 export function resultChanged(existing, fresh) {
   if (!existing) return true;

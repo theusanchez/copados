@@ -359,9 +359,12 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   const live = isInPlay(r);
   const kickoff = formatKickoff(r?.kickoff);
   // While a match is in play (live or halftime), the live score replaces the kickoff.
+  const metaBits = [];
+  if (kickoff) metaBits.push(`<span aria-hidden="true">🕑</span> ${kickoff}`);
+  if (r?.venue) metaBits.push(`🏟️ <span class="venue-name">${r.venue}</span>`);
   const headerHtml = live
     ? renderLiveScore(r, isKnockout)
-    : (kickoff ? `<div class="match-kickoff"><span aria-hidden="true">🕑</span> ${kickoff}</div>` : '');
+    : (metaBits.length ? `<div class="match-kickoff">${metaBits.join(' · ')}</div>` : '');
 
   let penHtml = '';
   if (isKnockout) {
@@ -742,7 +745,8 @@ function renderFixtureCard(it) {
   } else {
     const cd = !locked ? countdownLabel(ms) : null;
     const cdHtml = cd ? `<span class="fx-countdown">🔒 ${cd}</span>` : '';
-    topHtml = `<div class="fx-meta"><span class="fx-time">🕑 ${formatKickoff(r?.kickoff)}</span>${cdHtml}</div>`;
+    const venueHtml = r?.venue ? `<span class="fx-venue">🏟️ ${r.venue}</span>` : '';
+    topHtml = `<div class="fx-meta"><span class="fx-time">🕑 ${formatKickoff(r?.kickoff)}</span>${cdHtml}${venueHtml}</div>`;
   }
 
   return `

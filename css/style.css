@@ -755,6 +755,11 @@ main {
   text-transform: none;
 }
 
+.fx-venue,
+.venue-name {
+  text-transform: none;
+}
+
 .ko-tabs-wrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
