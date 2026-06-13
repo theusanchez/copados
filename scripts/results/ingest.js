@@ -88,6 +88,16 @@ async function main() {
   if (!res.ok) throw new Error(`football-data.org ${res.status}: ${await res.text()}`);
   const { matches = [] } = await res.json();
 
+  // Diagnostic: surface the raw API status for in-play/halftime matches so we can
+  // confirm whether football-data.org actually reports PAUSED (visible in the
+  // Actions run logs).
+  const liveApi = matches.filter(m => m.status === 'IN_PLAY' || m.status === 'PAUSED');
+  if (liveApi.length) {
+    console.log('Live per API: ' + liveApi
+      .map(m => `${m.homeTeam?.name} x ${m.awayTeam?.name} [${m.status}${m.minute != null ? ' ' + m.minute + "'" : ''}]`)
+      .join(' | '));
+  }
+
   const docs = {};       // appMatchId -> result doc
   const unmapped = [];
 
