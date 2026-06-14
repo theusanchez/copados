@@ -30,7 +30,20 @@ test('venue shows in the fixtures view', async ({ page }) => {
   await expect(page.locator('#fx-match-A1 .fx-venue')).toContainText('Estadio Azteca');
 });
 
-test('the final uses the real MetLife Stadium venue', async ({ page }) => {
+test('real per-fixture venues (matched by team pair, not by group)', async ({ page }) => {
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [user('me', 'Eu')],
+    predictions: {},
+    results: {},
+  });
+  // Same group, different venues — proves it is the official per-match assignment.
+  await expect(page.locator('#match-C1 .match-kickoff')).toContainText('MetLife Stadium');        // Brasil x Marrocos
+  await expect(page.locator('#match-C6 .match-kickoff')).toContainText('Mercedes-Benz Stadium');  // Marrocos x Haiti
+  await expect(page.locator('#match-F2 .match-kickoff')).toContainText('Estadio BBVA');            // Suécia x Tunísia
+});
+
+test('final and third place use the real fixed venues; other KO rounds show none', async ({ page }) => {
   await boot(page, {
     currentUser: user('me', 'Eu'),
     users: [user('me', 'Eu')],
@@ -40,4 +53,7 @@ test('the final uses the real MetLife Stadium venue', async ({ page }) => {
   await page.locator('.nav-tab[data-view="knockout"]').click();
   await expect(page.locator('#match-FINAL .match-kickoff'))
     .toContainText('MetLife Stadium · East Rutherford, Nova Jersey (EUA)');
+  await expect(page.locator('#match-THIRD .match-kickoff')).toContainText('Hard Rock Stadium');
+  // R32/R16/QF/SF intentionally have no venue yet (avoid showing a wrong one).
+  await expect(page.locator('#match-R32_01 .match-kickoff')).toHaveCount(0);
 });

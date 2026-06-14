@@ -1,10 +1,12 @@
 // World Cup 2026 venues. The 16 stadium/city/state/country values are real and were
 // cross-checked against en.wikipedia.org/wiki/2026_FIFA_World_Cup and nbcsports.com.
 //
-// This app's bracket is a simulated draw, so there is no official venue per fixture.
-// Group matches are assigned a realistic venue by region; the knockout finals, semis
-// and third-place use the real, slot-fixed venues (Final → MetLife, semis → Dallas &
-// Atlanta, third → Miami), confirmed via Wikipedia/MetLife Stadium.
+// The bracket in data.js IS the real 2026 draw, so MATCH_VENUE below is the official
+// venue for each group-stage fixture, matched by team pair against the ESPN schedule
+// (espn.com/.../2026-fifa-world-cup-fixtures...). Knockout: only the Final (MetLife)
+// and third-place (Miami) are mapped — both unambiguous, single-venue matches. The
+// R32/R16/QF/SF venues are left out until each bracket slot can be mapped precisely,
+// so we never show a wrong stadium.
 
 export const VENUES = {
   azteca:    { stadium: 'Estadio Azteca',          city: 'Cidade do México', state: 'CDMX',               country: 'México' },
@@ -25,30 +27,26 @@ export const VENUES = {
   bmo:       { stadium: 'BMO Field',               city: 'Toronto',          state: 'Ontário',            country: 'Canadá' },
 };
 
-// Each group anchored to one venue, clustered by region for realism.
-const GROUP_VENUE = {
-  A: 'azteca', B: 'bcplace', C: 'metlife', D: 'att', E: 'mercedes', F: 'sofi',
-  G: 'nrg', H: 'akron', I: 'linc', J: 'bbva', K: 'lumen', L: 'bmo',
+// Official venue per fixture (group stage matched by team pair; Final + third place).
+const MATCH_VENUE = {
+  A1: 'azteca',    A2: 'akron',     A3: 'mercedes',  A4: 'akron',     A5: 'azteca',    A6: 'bbva',
+  B1: 'bmo',       B2: 'levis',     B3: 'sofi',      B4: 'bcplace',   B5: 'bcplace',   B6: 'lumen',
+  C1: 'metlife',   C2: 'gillette',  C3: 'gillette',  C4: 'linc',      C5: 'hardrock',  C6: 'mercedes',
+  D1: 'sofi',      D2: 'bcplace',   D3: 'lumen',     D4: 'levis',     D5: 'sofi',      D6: 'levis',
+  E1: 'nrg',       E2: 'linc',      E3: 'bmo',       E4: 'arrowhead', E5: 'metlife',   E6: 'linc',
+  F1: 'att',       F2: 'bbva',      F3: 'nrg',       F4: 'bbva',      F5: 'att',       F6: 'arrowhead',
+  G1: 'lumen',     G2: 'sofi',      G3: 'sofi',      G4: 'bcplace',   G5: 'lumen',     G6: 'bcplace',
+  H1: 'mercedes',  H2: 'hardrock',  H3: 'mercedes',  H4: 'hardrock',  H5: 'akron',     H6: 'nrg',
+  I1: 'metlife',   I2: 'gillette',  I3: 'linc',      I4: 'metlife',   I5: 'gillette',  I6: 'bmo',
+  J1: 'arrowhead', J2: 'levis',     J3: 'att',       J4: 'levis',     J5: 'att',       J6: 'arrowhead',
+  K1: 'nrg',       K2: 'azteca',    K3: 'nrg',       K4: 'azteca',    K5: 'hardrock',  K6: 'mercedes',
+  L1: 'att',       L2: 'bmo',       L3: 'gillette',  L4: 'bmo',       L5: 'metlife',   L6: 'linc',
+  FINAL: 'metlife',
+  THIRD: 'hardrock',
 };
-
-// Real, slot-fixed knockout venues for the decisive rounds.
-const KO_FIXED = {
-  FINAL: 'metlife', THIRD: 'hardrock', SF_01: 'att', SF_02: 'mercedes',
-  QF_01: 'gillette', QF_02: 'levis', QF_03: 'lumen', QF_04: 'arrowhead',
-};
-
-// Earlier knockout rounds spread deterministically across all 16 stadiums.
-const KO_ROTATION = [
-  'azteca', 'bcplace', 'metlife', 'att', 'mercedes', 'sofi', 'nrg', 'akron',
-  'linc', 'bbva', 'lumen', 'bmo', 'gillette', 'levis', 'hardrock', 'arrowhead',
-];
 
 export function venueFor(matchId) {
-  if (/^[A-L][1-6]$/.test(matchId)) return VENUES[GROUP_VENUE[matchId[0]]] || null;
-  if (KO_FIXED[matchId]) return VENUES[KO_FIXED[matchId]];
-  const m = /^R(?:32|16)_(\d{2})$/.exec(matchId);
-  if (m) return VENUES[KO_ROTATION[(Number(m[1]) - 1) % KO_ROTATION.length]];
-  return null;
+  return VENUES[MATCH_VENUE[matchId]] || null;
 }
 
 // "Stadium · City, State (Country)" or null when unknown.
