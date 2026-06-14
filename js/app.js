@@ -177,44 +177,64 @@ const GUEST_LOCKED_VIEWS = ['compare', 'ranking', 'leagues'];
 // wire the auth listener (avoids a flash of the login screen).
 await completeMagicLinkIfPresent().catch(err => console.error('Magic link error', err));
 
+// Resolve to `fallback` if `promise` doesn't settle within `ms`. Firestore ops can
+// HANG (not reject) when the free-tier daily quota is exhausted, so the boot must cap
+// every wait — otherwise the app freezes on the loading spinner.
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 onAuthChange(async user => {
   rosterCache = null; // never carry one account's roster into another session
-  if (user) {
-    currentUser = user;
-    const guest = !!user.isAnonymous;
-    // Every backend call below is wrapped so a Firestore hiccup (e.g. the free-tier
-    // daily quota running out) degrades gracefully instead of trapping the boot on
-    // the loading spinner — the app must always reach showApp().
-    if (!guest) await saveUser(user).catch(err => console.error('saveUser failed', err));
-    [predictions, results, userLeagues] = await Promise.all([
-      loadPreds(user.uid).catch(() => ({})),
-      loadResults().catch(() => ({})),
-      guest ? Promise.resolve([]) : loadUserLeagues(user.uid).catch(() => []),
-    ]);
-    let knockoutWasReset = false;
-    if (!guest) {
-      try {
-        await consumeJoinLink();
-        knockoutWasReset = await applyKnockoutReset(user.uid);
-      } catch (err) { console.error('post-login step failed', err); }
-    }
-    restoreActiveLeague();
-    showApp();
-    renderUserInfo();
-    if (knockoutWasReset) showResetNotice();
-    renderProgress();
-    renderGroupsView();
-    renderKnockoutView();
+  if (unsubscribeResults) { unsubscribeResults(); unsubscribeResults = null; }
 
-    // Subscribe to live result updates (replaces any prior subscription).
-    if (unsubscribeResults) unsubscribeResults();
-    unsubscribeResults = watchResults(applyResultsUpdate);
-  } else {
+  if (!user) {
     currentUser = null;
     predictions = {};
+    results = {};
     userLeagues = [];
-    if (unsubscribeResults) { unsubscribeResults(); unsubscribeResults = null; }
     showLogin();
+    return;
+  }
+
+  currentUser = user;
+  const guest = !!user.isAnonymous;
+  results = {};
+  userLeagues = [];
+
+  // Saving the profile is fire-and-forget — a hung write must never block the boot.
+  if (!guest) saveUser(user).catch(err => console.error('saveUser failed', err));
+
+  // We need the user's own picks to land on the right tab, but cap the wait so an
+  // exhausted/slow Firestore can't freeze the loading screen.
+  predictions = await withTimeout(loadPreds(user.uid).catch(() => ({})), 5000, {});
+
+  restoreActiveLeague();
+  showApp();
+  renderUserInfo();
+  renderProgress();
+  renderGroupsView();
+  renderKnockoutView();
+  unsubscribeResults = watchResults(applyResultsUpdate);
+
+  // Everything below is best-effort and runs AFTER the app is already on screen.
+  loadResults()
+    .then(r => { results = r || {}; renderProgress(); renderGroupsView(); renderKnockoutView(); })
+    .catch(err => console.error('loadResults failed', err));
+
+  if (!guest) {
+    loadUserLeagues(user.uid)
+      .then(l => { userLeagues = l || []; restoreActiveLeague(); })
+      .catch(err => console.error('loadUserLeagues failed', err));
+    consumeJoinLink().catch(err => console.error('consumeJoinLink failed', err));
+    applyKnockoutReset(user.uid)
+      .then(wasReset => {
+        if (wasReset) { showResetNotice(); renderProgress(); renderGroupsView(); renderKnockoutView(); }
+      })
+      .catch(err => console.error('applyKnockoutReset failed', err));
   }
 });
 
