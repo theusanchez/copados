@@ -930,6 +930,13 @@ function fmtScore(p) {
   return `${p.home} — ${p.away}`;
 }
 
+// Points badge (+5/+3/+0) for the comparison rows, once a match is finished.
+function cmpPoints(pts) {
+  if (pts == null) return '';
+  const cls = pts === 5 ? 'cmp-pts-exact' : pts === 3 ? 'cmp-pts-partial' : 'cmp-pts-zero';
+  return `<span class="cmp-pts ${cls}">+${pts}</span>`;
+}
+
 function renderComparison(me, them) {
   const detail = document.getElementById('compare-detail');
   if (!detail) return;
@@ -945,6 +952,13 @@ function renderComparison(me, them) {
       const badge = bothFilled
         ? (same ? '<span class="cmp-badge cmp-ok">✓ igual</span>' : '<span class="cmp-badge cmp-diff">✗ diverge</span>')
         : '';
+      const r = results[m.id];
+      const finished = r && r.status === 'finished' && r.home != null && r.away != null;
+      const mePts = finished ? matchPoints(m.id, me.preds, me.koMatches, results) : null;
+      const themPts = finished ? matchPoints(m.id, them.preds, them.koMatches, results) : null;
+      const officialRow = finished
+        ? `<div class="cmp-row cmp-row-official"><span class="cmp-who">Resultado</span><span class="cmp-score">${r.home} — ${r.away}</span></div>`
+        : '';
       return `
         <div class="cmp-match">
           <div class="cmp-fixture">
@@ -952,9 +966,10 @@ function renderComparison(me, them) {
             <span class="cmp-fx-x">×</span>
             <span class="cmp-fx-team">${m.away} ${flag(m.away)}</span>
           </div>
-          <div class="cmp-row"><span class="cmp-who">${myName}</span><span class="cmp-score">${fmtScore(mp)}</span></div>
+          ${officialRow}
+          <div class="cmp-row"><span class="cmp-who">${myName}</span><span class="cmp-score">${fmtScore(mp)}</span>${cmpPoints(mePts)}</div>
           <div class="cmp-row${same ? ' cmp-row-ok' : (bothFilled ? ' cmp-row-diff' : '')}">
-            <span class="cmp-who">${themName}</span><span class="cmp-score">${fmtScore(tp)}</span>${badge}
+            <span class="cmp-who">${themName}</span><span class="cmp-score">${fmtScore(tp)}</span>${cmpPoints(themPts)}${badge}
           </div>
         </div>`;
     }).join('');
@@ -969,13 +984,28 @@ function renderComparison(me, them) {
       ? ` <span class="cmp-pen">(pên: ${km.penWinner})</span>` : '';
     return `<span class="cmp-ko-line">${flag(km.homeTeam)} ${km.homeTeam} <strong>${score}</strong> ${km.awayTeam} ${flag(km.awayTeam)}${pen}</span>`;
   };
+  const koOfficial = (m) => {
+    const res = results[m.id];
+    if (!res || res.status !== 'finished' || res.home == null || res.away == null) return '';
+    const pen = res.penWinner && Number(res.home) === Number(res.away)
+      ? ` <span class="cmp-pen">(pên: ${res.penWinner})</span>` : '';
+    return `<div class="cmp-row cmp-ko-row cmp-row-official"><span class="cmp-who">Resultado</span>` +
+      `<span class="cmp-ko-line">${flag(res.homeTeam)} ${res.homeTeam} <strong>${res.home} — ${res.away}</strong> ${res.awayTeam} ${flag(res.awayTeam)}${pen}</span></div>`;
+  };
   const rounds = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
   const koHtml = rounds.map(r => {
-    const matches = KNOCKOUT[r].map(m => `
+    const matches = KNOCKOUT[r].map(m => {
+      const res = results[m.id];
+      const finished = res && res.status === 'finished' && res.home != null && res.away != null;
+      const mePts = finished ? matchPoints(m.id, me.preds, me.koMatches, results) : null;
+      const themPts = finished ? matchPoints(m.id, them.preds, them.koMatches, results) : null;
+      return `
       <div class="cmp-match cmp-ko-match">
-        <div class="cmp-row cmp-ko-row"><span class="cmp-who">${myName}</span>${koLine(me.koMatches[m.id])}</div>
-        <div class="cmp-row cmp-ko-row"><span class="cmp-who">${themName}</span>${koLine(them.koMatches[m.id])}</div>
-      </div>`).join('');
+        ${koOfficial(m)}
+        <div class="cmp-row cmp-ko-row"><span class="cmp-who">${myName}</span>${koLine(me.koMatches[m.id])}${cmpPoints(mePts)}</div>
+        <div class="cmp-row cmp-ko-row"><span class="cmp-who">${themName}</span>${koLine(them.koMatches[m.id])}${cmpPoints(themPts)}</div>
+      </div>`;
+    }).join('');
     return `<div class="cmp-group"><h4 class="cmp-group-title">${ROUND_LABELS[r]}</h4>${matches}</div>`;
   }).join('');
 
