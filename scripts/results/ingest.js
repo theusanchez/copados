@@ -81,12 +81,31 @@ function loadCredential() {
 
 // --- main ------------------------------------------------------------------
 
+// football-data.org's free tier is flaky (rate limits, transient 5xx). Retry a few
+// times with backoff so a single bad response doesn't skip an entire ingest cycle.
+async function fetchMatches() {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let lastErr = 'unknown error';
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const res = await fetch(API_URL, { headers: { 'X-Auth-Token': TOKEN } });
+      if (res.ok) return (await res.json()).matches || [];
+      lastErr = `football-data.org ${res.status}: ${(await res.text()).slice(0, 200)}`;
+    } catch (e) {
+      lastErr = e.message;
+    }
+    if (attempt < 4) {
+      console.warn(`Fetch attempt ${attempt} failed (${lastErr}); retrying...`);
+      await sleep(attempt * 5000);
+    }
+  }
+  throw new Error(`All fetch attempts failed: ${lastErr}`);
+}
+
 async function main() {
   if (!TOKEN) throw new Error('Missing FOOTBALL_DATA_TOKEN.');
 
-  const res = await fetch(API_URL, { headers: { 'X-Auth-Token': TOKEN } });
-  if (!res.ok) throw new Error(`football-data.org ${res.status}: ${await res.text()}`);
-  const { matches = [] } = await res.json();
+  const matches = await fetchMatches();
 
   // Diagnostic: raw API status for in-play matches, to confirm whether the source
   // reports PAUSED (halftime). Visible in the Actions run logs.
@@ -160,9 +179,13 @@ async function main() {
   // 3) Persist only what changed — keeps writes (and the live listeners' read cost)
   //    proportional to actual updates instead of rewriting every doc each run.
   const db = admin.firestore();
-  const existingSnap = await db.collection('results').get();
   const existing = {};
-  existingSnap.forEach(d => { existing[d.id] = d.data(); });
+  try {
+    const existingSnap = await db.collection('results').get();
+    existingSnap.forEach(d => { existing[d.id] = d.data(); });
+  } catch (e) {
+    console.warn('Could not read existing results, writing all:', e.message);
+  }
 
   const batch = db.batch();
   let writes = 0;
