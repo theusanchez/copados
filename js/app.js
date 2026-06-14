@@ -2,7 +2,7 @@ import { loginWithGoogle, logout, onAuthChange, loginAsGuest, registerWithEmail,
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
 import { venueLabel } from './venues.js';
 import { FEATURES } from './features.js';
-import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, groupsComplete, bestStreak, perfectGroups, isNostradamus } from './engine.js';
+import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, bestStreak, perfectGroups, isNostradamus } from './engine.js';
 
 // -----------------------------------------------------------------------
 // State
@@ -83,6 +83,20 @@ function isMatchLocked(matchId) {
   return false;
 }
 
+// A match no longer needs a prediction once it's locked: a late joiner can't fill
+// a game that already kicked off, so a missing pick there must not block progress.
+function matchSettled(matchId, preds) {
+  const p = preds[matchId];
+  return isMatchLocked(matchId) || (p && p.home != null && p.away != null);
+}
+
+// The group stage is "ready" (knockout unlocks) when every group match is either
+// predicted or already locked. Using strict completeness would trap anyone who
+// joined after some group games started — they could never finish the group stage.
+function groupStageReady(preds) {
+  return Object.values(GROUPS).flatMap(g => g.matches).every(m => matchSettled(m.id, preds));
+}
+
 // Resolve the predicted champion from a knockout match set ('?' if undecided).
 function championOf(koMatches) {
   const finalMatch = koMatches['FINAL'];
@@ -94,14 +108,11 @@ function championOf(koMatches) {
   return finalMatch.penWinner || '?';
 }
 
-// A user is "complete" when every group and knockout match has both scores.
+// A user is "complete" when every match is either predicted or locked (a late
+// joiner can't fill past games, so those don't keep them "in progress" forever).
 function predsComplete(preds) {
-  const filled = m => {
-    const p = preds[m.id];
-    return p && p.home != null && p.away != null;
-  };
-  return Object.values(GROUPS).flatMap(g => g.matches).every(filled) &&
-    Object.values(KNOCKOUT).flat().every(filled);
+  return groupStageReady(preds) &&
+    Object.values(KNOCKOUT).flat().every(m => matchSettled(m.id, preds));
 }
 
 // Count how many group/knockout matches have a full scoreline, for the progress bar.
@@ -420,7 +431,7 @@ function renderUserInfo() {
 // -----------------------------------------------------------------------
 async function savePrediction(matchId, field, value) {
   if (!currentUser || isMatchLocked(matchId)) return;
-  if (KNOCKOUT_IDS.has(matchId) && !groupsComplete(predictions)) return;
+  if (KNOCKOUT_IDS.has(matchId) && !groupStageReady(predictions)) return;
   if (!predictions[matchId]) predictions[matchId] = {};
   predictions[matchId][field] = value === '' ? null : Number(value);
   // The same match can be on screen in more than one view (groups/knockout/fixtures);
@@ -437,7 +448,7 @@ async function savePrediction(matchId, field, value) {
     renderGroupStandings(groupKey);
     // If this save flipped group-stage completion, re-render the knockout to
     // (un)lock its inputs; otherwise just refresh the resolved team names.
-    if (groupsComplete(predictions) === koFillLocked) renderKnockoutView();
+    if (groupStageReady(predictions) === koFillLocked) renderKnockoutView();
     else refreshKnockoutTeams();
   } else {
     refreshKnockoutTeams();
@@ -446,7 +457,7 @@ async function savePrediction(matchId, field, value) {
 
 async function savePenWinner(matchId, team) {
   if (!currentUser || isMatchLocked(matchId)) return;
-  if (KNOCKOUT_IDS.has(matchId) && !groupsComplete(predictions)) return;
+  if (KNOCKOUT_IDS.has(matchId) && !groupStageReady(predictions)) return;
   if (!predictions[matchId]) predictions[matchId] = {};
   predictions[matchId].penWinner = team;
   await savePred(currentUser.uid, matchId, predictions[matchId]);
@@ -530,7 +541,7 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   const aVal = pred.away != null ? pred.away : '';
   // Knockout filling is blocked until the group stage is complete (the bracket is
   // still viewable so people can watch it take shape).
-  const koLocked = isKnockout && !groupsComplete(predictions);
+  const koLocked = isKnockout && !groupStageReady(predictions);
   const locked = isMatchLocked(match.id) || koLocked;
   const lockAttrs = locked ? 'readonly tabindex="-1"' : '';
   const r = results[match.id];
@@ -700,7 +711,7 @@ function collectLivePreds(groupKey) {
 function renderKnockoutView() {
   const container = document.getElementById('view-knockout');
   currentUserKo = resolveKnockout(predictions);
-  koFillLocked = !groupsComplete(predictions);
+  koFillLocked = !groupStageReady(predictions);
   const rounds = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
 
   const tabsHtml = rounds.map((r, i) =>
@@ -916,7 +927,7 @@ function renderFixtureCard(it) {
   const aVal = pred.away != null ? pred.away : '';
   const r = results[match.id];
   const live = isInPlay(r);
-  const koLocked = isKnockout && !groupsComplete(predictions);
+  const koLocked = isKnockout && !groupStageReady(predictions);
   const locked = isMatchLocked(match.id) || koLocked;
   const lockAttrs = locked ? 'readonly tabindex="-1"' : '';
   const pts = r && r.status === 'finished' && r.home != null && r.away != null
@@ -1009,7 +1020,7 @@ async function renderCompareView() {
     const koMatches = resolveKnockout(preds);
     // No champion until the group stage is complete — the bracket is otherwise
     // resolved from partial standings and would show a bogus winner.
-    const champion = groupsComplete(preds) ? championOf(koMatches) : '?';
+    const champion = groupStageReady(preds) ? championOf(koMatches) : '?';
     return {
       user: u,
       preds,

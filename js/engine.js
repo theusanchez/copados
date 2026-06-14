@@ -121,12 +121,16 @@ export function resolveKnockout(preds) {
 // -----------------------------------------------------------------------
 const GROUP_IDS = new Set(Object.values(GROUPS).flatMap(g => g.matches.map(m => m.id)));
 
-// The knockout bracket only makes sense once every group match has been predicted —
-// before that the bracket is resolved from partial standings and shouldn't count.
-export function groupsComplete(preds) {
+// The knockout points only count once the group stage is settled for this user:
+// every group match is either predicted or already finished. Strict "all predicted"
+// would permanently void the knockout of anyone who joined after some group games
+// started (they can't predict a played match), so finished games count as settled.
+export function groupStageScorable(preds, results) {
   return Object.values(GROUPS).flatMap(g => g.matches).every(m => {
     const p = preds[m.id];
-    return p && p.home != null && p.away != null;
+    if (p && p.home != null && p.away != null) return true;
+    const r = results[m.id];
+    return !!r && r.status === 'finished';
   });
 }
 
@@ -165,7 +169,7 @@ export function matchPoints(matchId, preds, koMatches, results) {
 // Total points + breakdown for a user across all known results.
 export function scoreUser(preds, results) {
   const koMatches = resolveKnockout(preds);
-  const groupsDone = groupsComplete(preds);
+  const groupsDone = groupStageScorable(preds, results);
   let total = 0, exact = 0, correct = 0;
   Object.keys(results).forEach(id => {
     // Knockout points don't count until the group stage is fully predicted.
