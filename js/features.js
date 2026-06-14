@@ -1,11 +1,12 @@
 // Feature flags.
 //
 // liveScores: shows AO VIVO / INTERVALO badges and the live scoreline on cards.
-// Disabled because football-data.org's FREE tier serves DELAYED scores — "live"
-// data is unreliable there. Flip to `true` once we're on a paid live-scores plan
-// (e.g. football-data.org "Free w/ Livescores"). All the live code stays in place.
+// Enabled 2026-06-14: an external cron (cron-job.org) now triggers the ingester
+// every minute via repository_dispatch, and the free data source refreshes match
+// records ~every minute, so live data is fresh enough. (No live game-clock minute —
+// that field stays paid.) Set back to `false` to hide the live UI without removing it.
 export const FEATURES = {
-  liveScores: false,
+  liveScores: true,
 };
 
 // Local override for tests / manual debugging (e.g. localStorage.feature_liveScores).

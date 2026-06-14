@@ -41,7 +41,10 @@ export async function boot(page, data) {
   await page.goto('/index.html?e2e=1');
 }
 
-// Turn on the (default-off) live-scores feature flag for tests that exercise it.
+// Force the live-scores feature flag on/off for tests (overrides the default).
 export async function enableLive(page) {
   await page.addInitScript(() => localStorage.setItem('feature_liveScores', 'true'));
+}
+export async function disableLive(page) {
+  await page.addInitScript(() => localStorage.setItem('feature_liveScores', 'false'));
 }
