@@ -968,6 +968,28 @@ main {
   margin-bottom: 2rem;
 }
 
+.btn-refresh {
+  background: var(--card);
+  color: var(--subtext);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  transition:
+    color var(--transition),
+    border-color var(--transition);
+}
+
+.btn-refresh:hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+.btn-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ================================================================
    Leagues
    ================================================================ */

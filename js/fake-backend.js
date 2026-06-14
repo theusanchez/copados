@@ -14,6 +14,10 @@ export function createFakeBackend() {
     resetVersions: structuredClone(seed.resetVersions || {}),
   };
   state.passwords = structuredClone(seed.passwords || {}); // email -> password
+  // Read counters exposed to E2E so tests can assert the roster cache prevents
+  // re-reading every user's predictions on each navigation / live update.
+  const reads = { userPreds: 0, allUsers: 0 };
+  if (typeof window !== 'undefined') window.__reads = reads;
   const authListeners = [];
   const notify = () => authListeners.forEach(cb => cb(state.currentUser));
   const newUid = () => `u_${Math.random().toString(36).slice(2, 10)}`;
@@ -103,7 +107,7 @@ export function createFakeBackend() {
     },
 
     async loadPreds(uid) { return structuredClone(state.predictions[uid] || {}); },
-    async loadUserPreds(uid) { return structuredClone(state.predictions[uid] || {}); },
+    async loadUserPreds(uid) { reads.userPreds++; return structuredClone(state.predictions[uid] || {}); },
 
     async deletePreds(uid, matchIds) {
       const p = state.predictions[uid];
@@ -111,7 +115,7 @@ export function createFakeBackend() {
     },
     async getResetVersion(uid) { return state.resetVersions[uid] || 0; },
     async setResetVersion(uid, version) { state.resetVersions[uid] = version; },
-    async loadAllUsers() { return structuredClone(state.users); },
+    async loadAllUsers() { reads.allUsers++; return structuredClone(state.users); },
     async loadResults() {
       return readResults();
     },

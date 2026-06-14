@@ -178,6 +178,7 @@ const GUEST_LOCKED_VIEWS = ['compare', 'ranking', 'leagues'];
 await completeMagicLinkIfPresent().catch(err => console.error('Magic link error', err));
 
 onAuthChange(async user => {
+  rosterCache = null; // never carry one account's roster into another session
   if (user) {
     currentUser = user;
     const guest = !!user.isAnonymous;
@@ -409,6 +410,7 @@ function renderGuestGate(container, view) {
 // fire onAuthChange, so refresh the now-real account's UI here.
 async function finishUpgrade(user, view) {
   currentUser = user;
+  rosterCache = null; // the guest just became a real user — refetch the roster
   await saveUser(user);
   userLeagues = await loadUserLeagues(user.uid);
   renderUserInfo();
@@ -445,6 +447,7 @@ async function savePrediction(matchId, field, value) {
   document.querySelectorAll(`.score-input[data-match-id="${matchId}"][data-side="${field}"]`)
     .forEach(inp => { if (inp.value !== value) inp.value = value; });
   await savePred(currentUser.uid, matchId, predictions[matchId]);
+  syncOwnPredsToRoster();
   renderProgress();
   // Rerender live standings for group stage
   const groupKey = Object.keys(GROUPS).find(g =>
@@ -467,6 +470,7 @@ async function savePenWinner(matchId, team) {
   if (!predictions[matchId]) predictions[matchId] = {};
   predictions[matchId].penWinner = team;
   await savePred(currentUser.uid, matchId, predictions[matchId]);
+  syncOwnPredsToRoster();
   refreshKnockoutTeams();
 }
 
@@ -1016,13 +1020,48 @@ setInterval(() => {
 // -----------------------------------------------------------------------
 let compareEntries = [];   // [{ user, preds, koMatches, champion, complete }]
 
+// In-memory roster cache: { users, preds: { uid: preds } }. Ranking + compare share it
+// so switching tabs or a live score update re-renders WITHOUT re-reading every user's
+// predictions from Firestore — that re-read on every navigation/update is what burned
+// the daily read quota. Refilled only on first use, on an explicit "Atualizar", or with
+// the user's own edits (updated locally, no read). Cleared on auth changes.
+let rosterCache = null;
+
+async function loadRoster({ force = false } = {}) {
+  if (rosterCache && !force) return rosterCache;
+  const users = await loadAllUsers();
+  const preds = {};
+  await Promise.all(users.map(async u => { preds[u.uid] = await loadUserPreds(u.uid); }));
+  rosterCache = { users, preds };
+  return rosterCache;
+}
+
+// Reflect the current user's own edits into the shared cache without a read.
+function syncOwnPredsToRoster() {
+  if (rosterCache && currentUser) rosterCache.preds[currentUser.uid] = { ...predictions };
+}
+
+const refreshBtnHtml =
+  '<button class="btn-refresh" type="button" aria-label="Atualizar">↻ Atualizar</button>';
+
+function wireRefresh(container, rerender) {
+  const btn = container.querySelector('.btn-refresh');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    await loadRoster({ force: true });
+    rerender();
+  });
+}
+
 async function renderCompareView() {
   const container = document.getElementById('view-compare');
   container.innerHTML = '<p class="loading-msg">Carregando...</p>';
 
-  const users = scopeUsers(await loadAllUsers());
-  compareEntries = await Promise.all(users.map(async u => {
-    const preds = await loadUserPreds(u.uid);
+  const { users: roster, preds: predsByUid } = await loadRoster();
+  const users = scopeUsers(roster);
+  compareEntries = users.map(u => {
+    const preds = predsByUid[u.uid] || {};
     const koMatches = resolveKnockout(preds);
     // No champion until the group stage is complete — the bracket is otherwise
     // resolved from partial standings and would show a bogus winner.
@@ -1034,7 +1073,7 @@ async function renderCompareView() {
       champion,
       complete: predsComplete(preds),
     };
-  }));
+  });
 
   const byName = (a, b) => (a.user.displayName || '').localeCompare(b.user.displayName || '');
   const complete = compareEntries.filter(e => e.complete).sort(byName);
@@ -1047,7 +1086,7 @@ async function renderCompareView() {
     </section>` : '';
 
   container.innerHTML = `
-    <div class="compare-header"><h2>Palpites · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}</div>
+    <div class="compare-header"><h2>Palpites · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>
     ${section('✓ Finalizados', complete)}
     ${section('⏳ Em andamento', incomplete)}
     <div id="compare-detail" class="compare-detail hidden"></div>
@@ -1055,6 +1094,7 @@ async function renderCompareView() {
 
   attachAvatarFallback(container);
   wireLeagueSwitcher(container, renderCompareView);
+  wireRefresh(container, renderCompareView);
 
   container.querySelectorAll('.compare-card').forEach(card => {
     card.addEventListener('click', () => {
@@ -1436,9 +1476,8 @@ async function renderRankingView() {
   const container = document.getElementById('view-ranking');
   container.innerHTML = '<p class="loading-msg">Carregando...</p>';
 
-  const users = scopeUsers(await loadAllUsers());
-  const preds = {};
-  await Promise.all(users.map(async u => { preds[u.uid] = await loadUserPreds(u.uid); }));
+  const { users: roster, preds } = await loadRoster();
+  const users = scopeUsers(roster);
 
   // Which rounds have been (at least partially) played, in order.
   const playedIdx = RANKING_ROUNDS
@@ -1504,7 +1543,7 @@ async function renderRankingView() {
     : '';
 
   container.innerHTML = `
-    <div class="compare-header"><h2>Ranking · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}</div>
+    <div class="compare-header"><h2>Ranking · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>
     ${empty}
     ${roundNote}
     <div class="ranking-list">${rowsHtml}</div>
@@ -1512,4 +1551,5 @@ async function renderRankingView() {
 
   attachAvatarFallback(container);
   wireLeagueSwitcher(container, renderRankingView);
+  wireRefresh(container, renderRankingView);
 }
