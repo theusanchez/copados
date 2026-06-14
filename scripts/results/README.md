@@ -52,11 +52,32 @@ draw in `../../js/data.js` diverges from the official one.
 
 ## Automation (GitHub Actions)
 
-`.github/workflows/results.yml` runs this every ~10 min (and on manual dispatch), fully free —
-no Firebase Blaze plan needed. Add two repository secrets under
-**Settings → Secrets and variables → Actions**:
+`.github/workflows/results.yml` runs this on three triggers, fully free — no Firebase Blaze
+plan needed. Add two repository secrets under **Settings → Secrets and variables → Actions**:
 
 - `FOOTBALL_DATA_TOKEN` — the football-data.org token.
 - `FIREBASE_SERVICE_ACCOUNT` — the full service-account JSON.
 
-Trigger a manual run from the **Actions** tab (Run workflow) to verify before relying on cron.
+Trigger a manual run from the **Actions** tab (Run workflow) to verify before relying on it.
+
+### Near-live trigger (external cron → `repository_dispatch`)
+
+GitHub's own `schedule` is throttled (often ~15-30 min in practice), so it's only a backup
+here. For ~1-2 min ingestion, an **external** cron pings GitHub's dispatch API — external
+dispatches are not throttled. The data source (football-data.org free tier) refreshes match
+records roughly every minute, so this is enough to feel live (no live game-clock minute,
+though — that field is paid).
+
+1. Create a **fine-grained GitHub PAT** (Settings → Developer settings → Tokens) scoped to
+   this repo with **Contents: read** and **Metadata: read** — wait, dispatch needs
+   **`repository_dispatch`**, so use a classic PAT with the `repo` scope (or a fine-grained
+   token with **Contents: read and write**, which authorizes dispatch).
+2. On a free cron service (e.g. **cron-job.org**), create a job that runs **every 1 minute**:
+   - **URL:** `https://api.github.com/repos/<owner>/copados/dispatches`
+   - **Method:** `POST`
+   - **Headers:** `Authorization: Bearer <PAT>`, `Accept: application/vnd.github+json`
+   - **Body:** `{"event_type":"ingest"}`
+3. Confirm runs appear in the **Actions** tab every ~1-2 min. Then flip `FEATURES.liveScores`
+   to `true` in `js/features.js` so the live UI matches the now-fresh data.
+
+A successful dispatch returns HTTP **204** (no body).

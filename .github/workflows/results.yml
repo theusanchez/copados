@@ -1,10 +1,14 @@
 name: Ingest World Cup results
 
 on:
+  # Primary trigger: an external cron (e.g. cron-job.org) POSTs to the GitHub
+  # `dispatches` API every 1-2 min. External dispatches are NOT throttled like
+  # GitHub's own `schedule`, so this is what gives near-live ingestion.
+  repository_dispatch:
+    types: [ingest]
+  # Backup only — GitHub throttles schedules heavily (often ~15-30 min in practice).
   schedule:
-    # Every ~3 min so live scores and halftime (PAUSED) transitions are caught in
-    # time. Free on public repos. GitHub may still delay schedules under peak load.
-    - cron: "*/3 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 concurrency:
