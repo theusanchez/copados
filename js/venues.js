@@ -41,8 +41,19 @@ const MATCH_VENUE = {
   J1: 'arrowhead', J2: 'levis',     J3: 'att',       J4: 'levis',     J5: 'att',       J6: 'arrowhead',
   K1: 'nrg',       K2: 'azteca',    K3: 'nrg',       K4: 'azteca',    K5: 'hardrock',  K6: 'mercedes',
   L1: 'att',       L2: 'bmo',       L3: 'gillette',  L4: 'bmo',       L5: 'metlife',   L6: 'linc',
+
+  // Round of 32 — each slot matched to its official venue by feeder (Wikipedia
+  // knockout bracket). The R32 matchups in data.js are correct, so these are real.
+  R32_01: 'sofi',  R32_02: 'gillette', R32_03: 'bbva',   R32_04: 'nrg',
+  R32_05: 'metlife', R32_06: 'att',    R32_07: 'azteca', R32_08: 'mercedes',
+  R32_09: 'levis', R32_10: 'lumen',    R32_11: 'bmo',    R32_12: 'sofi',
+  R32_13: 'bcplace', R32_14: 'hardrock', R32_15: 'arrowhead', R32_16: 'att',
+
+  // Final + third place are fixed, single-venue and bracket-independent.
   FINAL: 'metlife',
   THIRD: 'hardrock',
+  // R16/QF/SF venues are NOT mapped: data.js's knockout pairings don't match the
+  // official bracket, so those slots can't be resolved to a real venue yet.
 };
 
 export function venueFor(matchId) {
