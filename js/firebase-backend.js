@@ -2,6 +2,9 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   initializeAuth, browserLocalPersistence, browserPopupRedirectResolver,
   signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged,
+  signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  updateProfile, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink,
+  EmailAuthProvider, linkWithCredential, linkWithPopup,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, updateDoc, getDocs, onSnapshot,
@@ -31,7 +34,59 @@ export function createFirebaseBackend() {
     logout: () => signOut(auth),
     onAuthChange: cb => onAuthStateChanged(auth, cb),
 
+    loginAsGuest: () => signInAnonymously(auth),
+
+    async registerWithEmail(email, password, name) {
+      const { user } = await createUserWithEmailAndPassword(auth, email, password);
+      if (name) await updateProfile(user, { displayName: name });
+      return user;
+    },
+
+    loginWithEmail: (email, password) => signInWithEmailAndPassword(auth, email, password),
+
+    // Passwordless: email the user a link back to this same page. We remember the
+    // email (and chosen name) locally so completeMagicLinkIfPresent can finish it.
+    async sendMagicLink(email, name) {
+      localStorage.setItem('magicEmail', email);
+      if (name) localStorage.setItem('magicName', name);
+      await sendSignInLinkToEmail(auth, email, {
+        url: location.origin + location.pathname,
+        handleCodeInApp: true,
+      });
+    },
+
+    // Run on boot: if the current URL is a sign-in link, complete the login.
+    async completeMagicLinkIfPresent() {
+      if (!isSignInWithEmailLink(auth, location.href)) return false;
+      const email = localStorage.getItem('magicEmail');
+      if (!email) return false;
+      const { user } = await signInWithEmailLink(auth, email, location.href);
+      const name = localStorage.getItem('magicName');
+      if (name && !user.displayName) await updateProfile(user, { displayName: name });
+      localStorage.removeItem('magicEmail');
+      localStorage.removeItem('magicName');
+      history.replaceState(null, '', location.origin + location.pathname);
+      return true;
+    },
+
+    // Promote the current anonymous user to a permanent account, keeping the same
+    // uid (so their predictions carry over).
+    async upgradeGuest({ email, password, name }) {
+      const cred = EmailAuthProvider.credential(email, password);
+      const { user } = await linkWithCredential(auth.currentUser, cred);
+      if (name) await updateProfile(user, { displayName: name });
+      return user;
+    },
+
+    async upgradeGuestWithGoogle() {
+      const { user } = await linkWithPopup(auth.currentUser, provider);
+      return user;
+    },
+
     async saveUser(user) {
+      // Guests (anonymous) stay out of the `users` collection so they never show
+      // up in ranking/compare. On upgrade the uid persists and they get saved.
+      if (user.isAnonymous) return;
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
         displayName: user.displayName,

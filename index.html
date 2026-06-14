@@ -70,6 +70,48 @@
           </svg>
           Entrar com Google
         </button>
+
+        <div class="login-divider"><span>ou com e-mail</span></div>
+
+        <form id="email-form" class="email-form" novalidate>
+          <input
+            id="login-name"
+            class="login-input"
+            type="text"
+            autocomplete="name"
+            placeholder="Seu nome"
+            aria-label="Seu nome"
+          />
+          <input
+            id="login-email"
+            class="login-input"
+            type="email"
+            autocomplete="email"
+            placeholder="E-mail"
+            aria-label="E-mail"
+            required
+          />
+          <input
+            id="login-password"
+            class="login-input"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Senha (mín. 6 caracteres)"
+            aria-label="Senha"
+          />
+          <button id="btn-email" class="btn-email" type="submit">
+            Entrar / Criar conta
+          </button>
+          <button id="btn-magic" class="btn-magic" type="button">
+            Receber link de acesso por e-mail
+          </button>
+        </form>
+
+        <button id="btn-guest" class="btn-guest" type="button">
+          Entrar como convidado
+        </button>
+
+        <p id="login-msg" class="login-msg" role="alert" aria-live="polite"></p>
       </div>
     </div>
 

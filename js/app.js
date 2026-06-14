@@ -1,4 +1,4 @@
-import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, deletePreds, getResetVersion, setResetVersion, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
+import { loginWithGoogle, logout, onAuthChange, loginAsGuest, registerWithEmail, loginWithEmail, sendMagicLink, completeMagicLinkIfPresent, upgradeGuest, upgradeGuestWithGoogle, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, deletePreds, getResetVersion, setResetVersion, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
 import { venueLabel } from './venues.js';
 import { FEATURES } from './features.js';
@@ -154,15 +154,32 @@ function recomputeAll() {
 // -----------------------------------------------------------------------
 // Auth
 // -----------------------------------------------------------------------
+function isGuest() {
+  return !!currentUser?.isAnonymous;
+}
+
+// Social views require a real account: guests can play but not appear in / see
+// the ranking and league features until they sign up.
+const GUEST_LOCKED_VIEWS = ['compare', 'ranking', 'leagues'];
+
+// Finish a magic-link login if the app was opened from the email link, before we
+// wire the auth listener (avoids a flash of the login screen).
+await completeMagicLinkIfPresent().catch(err => console.error('Magic link error', err));
+
 onAuthChange(async user => {
   if (user) {
     currentUser = user;
-    await saveUser(user);
+    const guest = !!user.isAnonymous;
+    if (!guest) await saveUser(user);
     [predictions, results, userLeagues] = await Promise.all([
-      loadPreds(user.uid), loadResults(), loadUserLeagues(user.uid),
+      loadPreds(user.uid), loadResults(),
+      guest ? Promise.resolve([]) : loadUserLeagues(user.uid),
     ]);
-    await consumeJoinLink();
-    const knockoutWasReset = await applyKnockoutReset(user.uid);
+    let knockoutWasReset = false;
+    if (!guest) {
+      await consumeJoinLink();
+      knockoutWasReset = await applyKnockoutReset(user.uid);
+    }
     restoreActiveLeague();
     showApp();
     renderUserInfo();
@@ -214,8 +231,66 @@ function showResetNotice() {
   });
 }
 
+const loginMsgEl = document.getElementById('login-msg');
+function showLoginMsg(text, ok = false) {
+  loginMsgEl.textContent = text;
+  loginMsgEl.classList.toggle('success', ok);
+}
+
+function authErrorText(err) {
+  const map = {
+    'auth/email-already-in-use': 'Este e-mail já tem conta — confira a senha e tente entrar.',
+    'auth/invalid-email': 'E-mail inválido.',
+    'auth/wrong-password': 'Senha incorreta.',
+    'auth/invalid-credential': 'E-mail ou senha incorretos.',
+    'auth/weak-password': 'A senha precisa ter ao menos 6 caracteres.',
+    'auth/user-not-found': 'Conta não encontrada.',
+    'auth/too-many-requests': 'Muitas tentativas — tente novamente em instantes.',
+    'auth/credential-already-in-use': 'Esta conta Google já está em uso. Saia e entre com ela.',
+    'auth/popup-closed-by-user': 'Login cancelado.',
+  };
+  return map[err?.code] || 'Algo deu errado. Tente novamente.';
+}
+
 document.getElementById('btn-login').addEventListener('click', () => {
-  loginWithGoogle().catch(err => console.error('Login error', err));
+  showLoginMsg('');
+  loginWithGoogle().catch(err => showLoginMsg(authErrorText(err)));
+});
+
+// One field, two outcomes: register a new email, or sign in an existing one.
+document.getElementById('email-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  showLoginMsg('');
+  const name = document.getElementById('login-name').value.trim();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { showLoginMsg('Preencha e-mail e senha.'); return; }
+  try {
+    await registerWithEmail(email, password, name || email.split('@')[0]);
+  } catch (err) {
+    if (err?.code === 'auth/email-already-in-use') {
+      try { await loginWithEmail(email, password); }
+      catch (e2) { showLoginMsg(authErrorText(e2)); }
+    } else {
+      showLoginMsg(authErrorText(err));
+    }
+  }
+});
+
+document.getElementById('btn-magic').addEventListener('click', async () => {
+  showLoginMsg('');
+  const name = document.getElementById('login-name').value.trim();
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) { showLoginMsg('Digite seu e-mail para receber o link.'); return; }
+  try {
+    await sendMagicLink(email, name);
+    showLoginMsg('Link enviado! Confira seu e-mail e clique para entrar.', true);
+  } catch (err) { showLoginMsg(authErrorText(err)); }
+});
+
+document.getElementById('btn-guest').addEventListener('click', () => {
+  showLoginMsg('');
+  loginAsGuest().catch(err => showLoginMsg(authErrorText(err)));
 });
 
 document.getElementById('btn-logout').addEventListener('click', () => {
@@ -239,7 +314,17 @@ function showApp() {
   hideLoading();
   document.getElementById('view-login').classList.add('hidden');
   document.getElementById('view-app').classList.remove('hidden');
-  switchMainView(predsComplete(predictions) ? 'compare' : 'groups');
+  applyGuestUi();
+  const start = !isGuest() && predsComplete(predictions) ? 'compare' : 'groups';
+  switchMainView(start);
+}
+
+// Dim the social tabs a guest can't open yet.
+function applyGuestUi() {
+  const guest = isGuest();
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.classList.toggle('locked', guest && GUEST_LOCKED_VIEWS.includes(tab.dataset.view));
+  });
 }
 
 function switchMainView(view) {
@@ -249,10 +334,69 @@ function switchMainView(view) {
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.view === view);
   });
+  if (isGuest() && GUEST_LOCKED_VIEWS.includes(view)) {
+    renderGuestGate(document.getElementById(`view-${view}`), view);
+    return;
+  }
   if (view === 'fixtures') renderFixturesView();
   if (view === 'compare') renderCompareView();
   if (view === 'ranking') renderRankingView();
   if (view === 'leagues') renderLeaguesView();
+}
+
+// Shown to a guest in place of a locked social view: a sign-up prompt that
+// promotes the anonymous account (keeping their predictions).
+function renderGuestGate(container, view) {
+  const what = view === 'ranking' ? 'o ranking'
+    : view === 'leagues' ? 'as ligas' : 'a comparação de palpites';
+  container.innerHTML = `
+    <div class="guest-gate">
+      <span class="guest-gate-icon" aria-hidden="true">🔒</span>
+      <h2>Crie sua conta para ver ${what}</h2>
+      <p>Você está como <strong>convidado</strong>. Seus palpites já estão salvos — crie uma
+         conta para entrar no ranking e comparar com a galera. Você não perde nada.</p>
+      <form class="email-form guest-upgrade-form" novalidate>
+        <input class="login-input" type="text" autocomplete="name" placeholder="Seu nome" aria-label="Seu nome" />
+        <input class="login-input" type="email" autocomplete="email" placeholder="E-mail" aria-label="E-mail" required />
+        <input class="login-input" type="password" autocomplete="new-password" placeholder="Senha (mín. 6 caracteres)" aria-label="Senha" />
+        <button class="btn-upgrade" type="submit">Criar minha conta</button>
+        <button class="btn-magic" type="button" data-google>Usar minha conta Google</button>
+      </form>
+      <p class="login-msg guest-gate-msg" role="alert" aria-live="polite"></p>
+    </div>`;
+  const form = container.querySelector('.guest-upgrade-form');
+  const msg = container.querySelector('.guest-gate-msg');
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    msg.textContent = '';
+    const [nameEl, emailEl, passEl] = form.querySelectorAll('input');
+    const name = nameEl.value.trim();
+    const email = emailEl.value.trim();
+    const password = passEl.value;
+    if (!email || !password) { msg.textContent = 'Preencha e-mail e senha.'; return; }
+    try {
+      const u = await upgradeGuest({ email, password, name: name || email.split('@')[0] });
+      await finishUpgrade(u, view);
+    } catch (err) { msg.textContent = authErrorText(err); }
+  });
+  form.querySelector('[data-google]').addEventListener('click', async () => {
+    msg.textContent = '';
+    try {
+      const u = await upgradeGuestWithGoogle();
+      await finishUpgrade(u, view);
+    } catch (err) { msg.textContent = authErrorText(err); }
+  });
+}
+
+// linkWithCredential keeps the same uid (predictions carry over) but does NOT
+// fire onAuthChange, so refresh the now-real account's UI here.
+async function finishUpgrade(user, view) {
+  currentUser = user;
+  await saveUser(user);
+  userLeagues = await loadUserLeagues(user.uid);
+  renderUserInfo();
+  applyGuestUi();
+  switchMainView(view);
 }
 
 document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -1064,9 +1208,11 @@ function activeLeagueName() {
 }
 
 // Scope ranking/compare to the active league's members; null = everyone.
+// Guests are never persisted to `users`, but filter them out defensively too.
 function scopeUsers(users) {
+  const real = users.filter(u => !u.isAnonymous && !u.isGuest);
   const l = getActiveLeague();
-  return l ? users.filter(u => l.memberUids.includes(u.uid)) : users;
+  return l ? real.filter(u => l.memberUids.includes(u.uid)) : real;
 }
 
 function restoreActiveLeague() {

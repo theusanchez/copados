@@ -11,6 +11,13 @@ const backend = E2E
 export const loginWithGoogle = (...a) => backend.loginWithGoogle(...a);
 export const logout = (...a) => backend.logout(...a);
 export const onAuthChange = (...a) => backend.onAuthChange(...a);
+export const loginAsGuest = (...a) => backend.loginAsGuest(...a);
+export const registerWithEmail = (...a) => backend.registerWithEmail(...a);
+export const loginWithEmail = (...a) => backend.loginWithEmail(...a);
+export const sendMagicLink = (...a) => backend.sendMagicLink(...a);
+export const completeMagicLinkIfPresent = (...a) => backend.completeMagicLinkIfPresent(...a);
+export const upgradeGuest = (...a) => backend.upgradeGuest(...a);
+export const upgradeGuestWithGoogle = (...a) => backend.upgradeGuestWithGoogle(...a);
 export const saveUser = (...a) => backend.saveUser(...a);
 export const savePred = (...a) => backend.savePred(...a);
 export const loadPreds = (...a) => backend.loadPreds(...a);

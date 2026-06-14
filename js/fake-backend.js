@@ -13,8 +13,10 @@ export function createFakeBackend() {
     leagues: structuredClone(seed.leagues || []),
     resetVersions: structuredClone(seed.resetVersions || {}),
   };
+  state.passwords = structuredClone(seed.passwords || {}); // email -> password
   const authListeners = [];
   const notify = () => authListeners.forEach(cb => cb(state.currentUser));
+  const newUid = () => `u_${Math.random().toString(36).slice(2, 10)}`;
 
   // Tests can simulate the ingester updating results by writing the `e2e_results`
   // localStorage key; otherwise we return the seeded results.
@@ -34,7 +36,61 @@ export function createFakeBackend() {
     logout: async () => { state.currentUser = null; notify(); },
     onAuthChange: cb => { authListeners.push(cb); queueMicrotask(() => cb(state.currentUser)); },
 
+    async loginAsGuest() {
+      state.currentUser = { uid: newUid(), displayName: 'Convidado', email: null, photoURL: null, isAnonymous: true };
+      notify();
+      return state.currentUser;
+    },
+
+    async registerWithEmail(email, password, name) {
+      if (state.users.some(u => u.email === email)) {
+        throw { code: 'auth/email-already-in-use' };
+      }
+      state.passwords[email] = password;
+      state.currentUser = { uid: newUid(), displayName: name, email, photoURL: null, isAnonymous: false };
+      notify();
+      return state.currentUser;
+    },
+
+    async loginWithEmail(email, password) {
+      const u = state.users.find(x => x.email === email);
+      if (!u) throw { code: 'auth/user-not-found' };
+      if (state.passwords[email] !== password) throw { code: 'auth/wrong-password' };
+      state.currentUser = { ...u, isAnonymous: false };
+      notify();
+      return state.currentUser;
+    },
+
+    // No real email under the test seam — the link is "completed" via seed.magicLink.
+    async sendMagicLink(email, name) { state.pendingMagic = { email, name }; },
+
+    async completeMagicLinkIfPresent() {
+      const m = seed.magicLink || state.pendingMagic;
+      if (!m) return false;
+      const existing = state.users.find(u => u.email === m.email);
+      state.currentUser = existing
+        ? { ...existing, isAnonymous: false }
+        : { uid: newUid(), displayName: m.name || m.email, email: m.email, photoURL: null, isAnonymous: false };
+      notify();
+      return true;
+    },
+
+    // Promote the current guest, keeping the same uid so predictions carry over.
+    // Mirrors real linkWithCredential: does NOT fire onAuthChange (same user).
+    async upgradeGuest({ email, password, name }) {
+      state.passwords[email] = password;
+      state.currentUser = { ...state.currentUser, displayName: name || state.currentUser.displayName, email, isAnonymous: false };
+      return state.currentUser;
+    },
+
+    async upgradeGuestWithGoogle() {
+      const g = seed.googleUser || { displayName: 'Google User', photoURL: null };
+      state.currentUser = { ...state.currentUser, displayName: g.displayName, photoURL: g.photoURL, email: g.email || null, isAnonymous: false };
+      return state.currentUser;
+    },
+
     async saveUser(user) {
+      if (user.isAnonymous) return;
       const i = state.users.findIndex(u => u.uid === user.uid);
       const rec = { uid: user.uid, displayName: user.displayName, email: user.email, photoURL: user.photoURL };
       if (i >= 0) state.users[i] = { ...state.users[i], ...rec };

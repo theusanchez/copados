@@ -153,6 +153,139 @@ img {
   flex-shrink: 0;
 }
 
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+  color: var(--subtext);
+  font-size: 0.8rem;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.email-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.login-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.85rem;
+  color: var(--text);
+  font-size: 0.95rem;
+  transition: border-color var(--transition);
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.btn-email {
+  background: var(--green);
+  color: #06210f;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: opacity var(--transition);
+}
+
+.btn-magic {
+  background: transparent;
+  color: var(--primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: border-color var(--transition);
+}
+
+.btn-email:hover {
+  opacity: 0.88;
+}
+.btn-magic:hover {
+  border-color: var(--primary);
+}
+
+.btn-guest {
+  margin-top: 1.25rem;
+  background: transparent;
+  color: var(--subtext);
+  border: none;
+  font-size: 0.9rem;
+  text-decoration: underline;
+}
+
+.btn-guest:hover {
+  color: var(--text);
+}
+
+.login-msg {
+  margin-top: 1rem;
+  min-height: 1.2em;
+  font-size: 0.88rem;
+  color: var(--red);
+}
+
+.login-msg.success {
+  color: var(--green);
+}
+
+/* Guest upgrade gate shown in place of ranking/compare for anonymous users. */
+.guest-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--subtext);
+}
+
+.guest-gate-icon {
+  font-size: 3rem;
+}
+.guest-gate h2 {
+  color: var(--text);
+  font-size: 1.3rem;
+}
+.guest-gate p {
+  max-width: 28rem;
+}
+
+.btn-upgrade {
+  background: var(--green);
+  color: #06210f;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.75rem 1.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: opacity var(--transition);
+}
+
+.btn-upgrade:hover {
+  opacity: 0.88;
+}
+
+.nav-tab.locked {
+  opacity: 0.55;
+}
+
 /* ================================================================
    App Shell
    ================================================================ */
