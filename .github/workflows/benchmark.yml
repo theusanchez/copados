@@ -1,0 +1,28 @@
+name: Benchmark football-data.org freshness
+
+# Manual only. Run it WHILE a World Cup match is live to measure how delayed the
+# free data tier actually is (see scripts/results/benchmark.js).
+on:
+  workflow_dispatch:
+    inputs:
+      polls:
+        description: How many times to poll the API
+        default: "10"
+      gap_seconds:
+        description: Seconds between polls
+        default: "20"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Poll the API and measure lag
+        env:
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+          ITER: ${{ inputs.polls }}
+          GAP_S: ${{ inputs.gap_seconds }}
+        run: node scripts/results/benchmark.js
