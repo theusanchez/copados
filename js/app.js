@@ -181,15 +181,21 @@ onAuthChange(async user => {
   if (user) {
     currentUser = user;
     const guest = !!user.isAnonymous;
-    if (!guest) await saveUser(user);
+    // Every backend call below is wrapped so a Firestore hiccup (e.g. the free-tier
+    // daily quota running out) degrades gracefully instead of trapping the boot on
+    // the loading spinner — the app must always reach showApp().
+    if (!guest) await saveUser(user).catch(err => console.error('saveUser failed', err));
     [predictions, results, userLeagues] = await Promise.all([
-      loadPreds(user.uid), loadResults(),
-      guest ? Promise.resolve([]) : loadUserLeagues(user.uid),
+      loadPreds(user.uid).catch(() => ({})),
+      loadResults().catch(() => ({})),
+      guest ? Promise.resolve([]) : loadUserLeagues(user.uid).catch(() => []),
     ]);
     let knockoutWasReset = false;
     if (!guest) {
-      await consumeJoinLink();
-      knockoutWasReset = await applyKnockoutReset(user.uid);
+      try {
+        await consumeJoinLink();
+        knockoutWasReset = await applyKnockoutReset(user.uid);
+      } catch (err) { console.error('post-login step failed', err); }
     }
     restoreActiveLeague();
     showApp();

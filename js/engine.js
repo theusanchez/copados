@@ -134,6 +134,17 @@ export function groupStageScorable(preds, results) {
   });
 }
 
+// Kept exported so an app.js cached from a previous deploy (which still does
+// `import { groupsComplete }`) keeps linking against this module. Removing an
+// export breaks mixed-cache loads under the service worker (white screen) — see the
+// SW gotcha in CLAUDE.md. The live code uses groupStageScorable / groupStageReady.
+export function groupsComplete(preds) {
+  return Object.values(GROUPS).flatMap(g => g.matches).every(m => {
+    const p = preds[m.id];
+    return p && p.home != null && p.away != null;
+  });
+}
+
 function scorelinePoints(ph, pa, rh, ra) {
   if (ph == null || pa == null || rh == null || ra == null) return 0;
   ph = Number(ph); pa = Number(pa); rh = Number(rh); ra = Number(ra);
