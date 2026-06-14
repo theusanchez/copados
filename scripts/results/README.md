@@ -68,10 +68,12 @@ dispatches are not throttled. The data source (football-data.org free tier) refr
 records roughly every minute, so this is enough to feel live (no live game-clock minute,
 though — that field is paid).
 
-1. Create a **fine-grained GitHub PAT** (Settings → Developer settings → Tokens) scoped to
-   this repo with **Contents: read** and **Metadata: read** — wait, dispatch needs
-   **`repository_dispatch`**, so use a classic PAT with the `repo` scope (or a fine-grained
-   token with **Contents: read and write**, which authorizes dispatch).
+1. Create a **fine-grained GitHub PAT** (Settings → Developer settings → Fine-grained tokens)
+   scoped to **only this repo**, with **Repository permissions → Contents: Read and write**
+   (that's what authorizes `repository_dispatch`), and an **expiration date**. This is the
+   safest option — if it leaks, the blast radius is just this one public repo, and it expires
+   on its own. (A classic token with the `public_repo` scope also works but grants write
+   access to _all_ your public repos — prefer fine-grained.)
 2. On a free cron service (e.g. **cron-job.org**), create a job that runs **every 1 minute**:
    - **URL:** `https://api.github.com/repos/<owner>/copados/dispatches`
    - **Method:** `POST`
