@@ -1,4 +1,4 @@
-import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
+import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, deletePreds, getResetVersion, setResetVersion, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
 import { venueLabel } from './venues.js';
 import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, groupsComplete, bestStreak, perfectGroups, isNostradamus } from './engine.js';
@@ -16,6 +16,10 @@ let activeLeagueId = 'geral'; // 'geral' = everyone; otherwise a private league 
 let unsubscribeResults = null; // active Firestore results listener, if any
 
 const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
+
+// Bump when a knockout-structure change must invalidate users' saved knockout picks.
+// v1: 2026-06-14 — fixed the R16+ bracket to match the official 2026 flow.
+const KNOCKOUT_RESET_VERSION = 1;
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -157,9 +161,11 @@ onAuthChange(async user => {
       loadPreds(user.uid), loadResults(), loadUserLeagues(user.uid),
     ]);
     await consumeJoinLink();
+    const knockoutWasReset = await applyKnockoutReset(user.uid);
     restoreActiveLeague();
     showApp();
     renderUserInfo();
+    if (knockoutWasReset) showResetNotice();
     renderProgress();
     renderGroupsView();
     renderKnockoutView();
@@ -175,6 +181,37 @@ onAuthChange(async user => {
     showLogin();
   }
 });
+
+// One-off migration: if the user's saved knockout picks predate the bracket fix,
+// delete them so they refill against the correct bracket. Server-side versioned, so
+// it runs exactly once per user (and never wipes refilled picks on a second device).
+async function applyKnockoutReset(uid) {
+  const ver = await getResetVersion(uid);
+  if (ver >= KNOCKOUT_RESET_VERSION) return false;
+  const koIds = [...KNOCKOUT_IDS].filter(id => predictions[id]);
+  if (koIds.length) {
+    await deletePreds(uid, koIds);
+    koIds.forEach(id => delete predictions[id]);
+  }
+  await setResetVersion(uid, KNOCKOUT_RESET_VERSION);
+  return koIds.length > 0;
+}
+
+function showResetNotice() {
+  const el = document.getElementById('reset-notice');
+  if (!el) return;
+  el.innerHTML = `
+    <span class="reset-notice-text">
+      ⚠️ Corrigimos um erro no chaveamento do <strong>mata-mata</strong>. Seus palpites
+      dessa fase foram resetados — por favor, <strong>preencha novamente</strong>.
+    </span>
+    <button class="reset-notice-close" type="button" aria-label="Fechar aviso">×</button>`;
+  el.classList.remove('hidden');
+  el.querySelector('.reset-notice-close').addEventListener('click', () => {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+  });
+}
 
 document.getElementById('btn-login').addEventListener('click', () => {
   loginWithGoogle().catch(err => console.error('Login error', err));

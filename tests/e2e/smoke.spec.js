@@ -36,6 +36,7 @@ test('a fully-filled user opens on the compare tab', async ({ page }) => {
     currentUser: user('me', 'Eu Mesmo'),
     users: [user('me', 'Eu Mesmo')],
     predictions: { me: fullPreds() },
+    resetVersions: { me: 1 }, // already migrated → keep the full bolão
   });
 
   await expect(page.locator('#view-compare')).toBeVisible();

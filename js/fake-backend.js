@@ -11,6 +11,7 @@ export function createFakeBackend() {
     predictions: structuredClone(seed.predictions || {}),
     results: structuredClone(seed.results || {}),
     leagues: structuredClone(seed.leagues || []),
+    resetVersions: structuredClone(seed.resetVersions || {}),
   };
   const authListeners = [];
   const notify = () => authListeners.forEach(cb => cb(state.currentUser));
@@ -47,6 +48,13 @@ export function createFakeBackend() {
 
     async loadPreds(uid) { return structuredClone(state.predictions[uid] || {}); },
     async loadUserPreds(uid) { return structuredClone(state.predictions[uid] || {}); },
+
+    async deletePreds(uid, matchIds) {
+      const p = state.predictions[uid];
+      if (p) matchIds.forEach(id => delete p[id]);
+    },
+    async getResetVersion(uid) { return state.resetVersions[uid] || 0; },
+    async setResetVersion(uid, version) { state.resetVersions[uid] = version; },
     async loadAllUsers() { return structuredClone(state.users); },
     async loadResults() {
       return readResults();

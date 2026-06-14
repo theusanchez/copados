@@ -4,8 +4,8 @@ import {
   signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
-  getFirestore, doc, setDoc, updateDoc, getDocs, onSnapshot, collection, query, where,
-  arrayUnion, serverTimestamp,
+  getFirestore, doc, getDoc, setDoc, deleteDoc, updateDoc, getDocs, onSnapshot,
+  collection, query, where, arrayUnion, serverTimestamp, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
@@ -50,6 +50,22 @@ export function createFirebaseBackend() {
 
     loadPreds,
     loadUserPreds: loadPreds,
+
+    async deletePreds(uid, matchIds) {
+      const batch = writeBatch(db);
+      matchIds.forEach(id => batch.delete(doc(db, 'predictions', uid, 'matches', id)));
+      await batch.commit();
+    },
+
+    // Per-user marker for one-off prediction migrations (e.g. the knockout reset).
+    async getResetVersion(uid) {
+      const d = await getDoc(doc(db, 'users', uid));
+      return (d.exists() && d.data().knockoutResetVersion) || 0;
+    },
+
+    async setResetVersion(uid, version) {
+      await setDoc(doc(db, 'users', uid), { knockoutResetVersion: version }, { merge: true });
+    },
 
     async loadAllUsers() {
       const snap = await getDocs(collection(db, 'users'));

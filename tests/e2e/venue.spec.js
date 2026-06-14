@@ -51,11 +51,12 @@ test('final and third place use the real fixed venues; other KO rounds show none
     results: {},
   });
   await page.locator('.nav-tab[data-view="knockout"]').click();
+  // Bracket now follows the official flow, so every round maps to its real venue.
+  await expect(page.locator('#match-R32_01 .match-kickoff')).toContainText('SoFi Stadium');
+  await expect(page.locator('#match-R16_01 .match-kickoff')).toContainText('Lincoln Financial Field');
+  await expect(page.locator('#match-QF_01 .match-kickoff')).toContainText('Gillette Stadium');
+  await expect(page.locator('#match-SF_01 .match-kickoff')).toContainText('AT&T Stadium');
+  await expect(page.locator('#match-THIRD .match-kickoff')).toContainText('Hard Rock Stadium');
   await expect(page.locator('#match-FINAL .match-kickoff'))
     .toContainText('MetLife Stadium · East Rutherford, Nova Jersey (EUA)');
-  await expect(page.locator('#match-THIRD .match-kickoff')).toContainText('Hard Rock Stadium');
-  // Round of 32 slots are correct, so they get their real venue.
-  await expect(page.locator('#match-R32_01 .match-kickoff')).toContainText('SoFi Stadium');
-  // R16/QF/SF have no venue yet (data.js bracket pairings don't match the official one).
-  await expect(page.locator('#match-R16_01 .match-kickoff')).toHaveCount(0);
 });

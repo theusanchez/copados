@@ -57,6 +57,7 @@ test('perfect-group and Nostradamus badges', async ({ page }) => {
     users: [user('me', 'Eu')],
     predictions: { me: preds },
     results,
+    resetVersions: { me: 1 }, // keep the knockout picks (needed for Nostradamus)
   });
   await page.locator('.nav-tab[data-view="ranking"]').click();
 

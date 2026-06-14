@@ -47,6 +47,7 @@ test('a complete bolão shows the completion message', async ({ page }) => {
     currentUser: user('me', 'Eu'),
     users: [user('me', 'Eu')],
     predictions: { me: fullPreds() },
+    resetVersions: { me: 1 }, // already migrated → keep the full bolão
   });
 
   const tracker = page.locator('#progress-tracker');
