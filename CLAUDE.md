@@ -89,6 +89,10 @@ Knockout only scores when the predicted matchup equals the real one.
   stale dependency). Rely on the SW for freshness.
 - **Live updates are real-time** via a Firestore `onSnapshot` listener (`watchResults`),
   not polling — billed per changed doc. Don't reintroduce client polling.
+- **`FEATURES.liveScores` (`js/features.js`) is OFF by default.** The free data source
+  delivers delayed scores, so AO VIVO / INTERVALO / live-scoreline rendering is gated
+  behind this flag (the code stays in place). Flip to `true` only on a paid live plan.
+  Tests opt in via `enableLive(page)` (sets `localStorage.feature_liveScores`).
 - **GitHub Actions cron is unreliable**: configured `*/3` but GitHub's floor is 5 min and
   in practice it runs every ~10–30 min and may skip. Free on this (public) repo. Truly
   real-time live scores would need a different mechanism (external cron / always-on

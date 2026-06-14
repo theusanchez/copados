@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { seed, user } from './helpers.js';
+import { seed, user, enableLive } from './helpers.js';
 
 const T = new Date('2026-06-13T19:00:00Z').getTime();
 const HOUR = 3600000;
 
 test('a match going live shows the badge without a manual reload', async ({ page }) => {
   await page.clock.install({ time: T });
+  await enableLive(page);
   await seed(page, {
     currentUser: user('me', 'Eu'),
     users: [user('me', 'Eu')],

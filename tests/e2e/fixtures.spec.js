@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { boot, user } from './helpers.js';
+import { boot, user, enableLive } from './helpers.js';
 
 const HOUR = 3600000;
 const DAY = 86400000;
@@ -72,6 +72,7 @@ test('saving a score in the fixtures view syncs to the groups view', async ({ pa
 });
 
 test('a live match in the fixtures list shows the AO VIVO badge', async ({ page }) => {
+  await enableLive(page);
   await boot(page, {
     currentUser: user('me', 'Eu'),
     users: [user('me', 'Eu')],

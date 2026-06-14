@@ -1,6 +1,7 @@
 import { loginWithGoogle, logout, onAuthChange, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, deletePreds, getResetVersion, setResetVersion, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
 import { venueLabel } from './venues.js';
+import { FEATURES } from './features.js';
 import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, groupsComplete, bestStreak, perfectGroups, isNostradamus } from './engine.js';
 
 // -----------------------------------------------------------------------
@@ -429,7 +430,7 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   }
 
   return `
-    <div class="match-card${locked ? ' locked' : ''}${live ? ' live' : ''}${r?.status === 'paused' ? ' paused' : ''}${resultClass}" id="match-${match.id}">
+    <div class="match-card${locked ? ' locked' : ''}${live ? ' live' : ''}${live && r?.status === 'paused' ? ' paused' : ''}${resultClass}" id="match-${match.id}">
       ${headerHtml}
       <div class="match-body">
         <div class="team home-team">
@@ -469,8 +470,10 @@ function renderLiveScore(r, isKnockout) {
     </div>`;
 }
 
-// A match is "in play" (locked, showing a live scoreline) while live or at halftime.
+// A match is "in play" (showing a live scoreline) while live or at halftime.
+// Gated by the liveScores flag — the free data source's live data is unreliable.
 function isInPlay(r) {
+  if (!FEATURES.liveScores) return false;
   return r?.status === 'live' || r?.status === 'paused';
 }
 
@@ -790,7 +793,7 @@ function renderFixtureCard(it) {
   }
 
   return `
-    <div class="match-card fx-card${locked ? ' locked' : ''}${live ? ' live' : ''}${r?.status === 'paused' ? ' paused' : ''}${resultClass}" id="fx-match-${match.id}">
+    <div class="match-card fx-card${locked ? ' locked' : ''}${live ? ' live' : ''}${live && r?.status === 'paused' ? ' paused' : ''}${resultClass}" id="fx-match-${match.id}">
       ${topHtml}
       <div class="match-body">
         <div class="team home-team">

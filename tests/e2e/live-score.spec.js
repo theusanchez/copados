@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { boot, user } from './helpers.js';
+import { boot, user, enableLive } from './helpers.js';
+
+test.beforeEach(async ({ page }) => { await enableLive(page); });
 
 test('shows a live badge and current score on a group match in progress', async ({ page }) => {
   await boot(page, {

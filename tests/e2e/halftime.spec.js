@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { boot, user } from './helpers.js';
+import { boot, user, enableLive } from './helpers.js';
+
+test.beforeEach(async ({ page }) => { await enableLive(page); });
 
 test('a paused match shows the INTERVALO badge and stays locked', async ({ page }) => {
   await boot(page, {
