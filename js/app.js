@@ -321,7 +321,7 @@ document.getElementById('btn-magic').addEventListener('click', async () => {
   const email = document.getElementById('login-email').value.trim();
   if (!email) { showLoginMsg('Digite seu e-mail para receber o link.'); return; }
   try {
-    await sendMagicLink(email, name);
+    await sendMagicLink(email, name || email.split('@')[0]);
     showLoginMsg('Link enviado! Confira seu e-mail e clique para entrar.', true);
   } catch (err) { showLoginMsg(authErrorText(err)); }
 });
@@ -1049,7 +1049,9 @@ let rosterCache = null;
 
 async function loadRoster({ force = false } = {}) {
   if (rosterCache && !force) return rosterCache;
-  const users = await loadAllUsers();
+  // Guard against legacy docs saved with a null/empty displayName so the UI never
+  // renders the literal string "null" for them.
+  const users = (await loadAllUsers()).map(u => ({ ...u, displayName: u.displayName || 'Sem nome' }));
   const preds = {};
   await Promise.all(users.map(async u => { preds[u.uid] = await loadUserPreds(u.uid); }));
   rosterCache = { users, preds };

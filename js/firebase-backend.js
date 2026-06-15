@@ -38,7 +38,8 @@ export function createFirebaseBackend() {
 
     async registerWithEmail(email, password, name) {
       const { user } = await createUserWithEmailAndPassword(auth, email, password);
-      if (name) await updateProfile(user, { displayName: name });
+      // Always set a display name so a user never lands in the roster as "null".
+      await updateProfile(user, { displayName: name || email.split('@')[0] });
       return user;
     },
 
@@ -61,8 +62,11 @@ export function createFirebaseBackend() {
       const email = localStorage.getItem('magicEmail');
       if (!email) return false;
       const { user } = await signInWithEmailLink(auth, email, location.href);
-      const name = localStorage.getItem('magicName');
-      if (name && !user.displayName) await updateProfile(user, { displayName: name });
+      // Email-link users have no display name; derive one so they never show as "null".
+      if (!user.displayName) {
+        const name = localStorage.getItem('magicName');
+        await updateProfile(user, { displayName: name || email.split('@')[0] });
+      }
       localStorage.removeItem('magicEmail');
       localStorage.removeItem('magicName');
       history.replaceState(null, '', location.origin + location.pathname);

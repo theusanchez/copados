@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { boot } from './helpers.js';
+import { boot, user } from './helpers.js';
 
 // Start at the login screen (no seeded currentUser) and exercise the new
 // email-based entry points.
@@ -61,4 +61,18 @@ test('opening the app from a magic link signs the user in', async ({ page }) => 
 
   await expect(page.locator('#view-app')).toBeVisible();
   await expect(page.locator('#user-info')).toContainText('Caio');
+});
+
+test('a user saved without a name shows a fallback, never the string "null"', async ({ page }) => {
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [user('me', 'Eu'), { uid: 'x', displayName: null, email: 'x@example.com', photoURL: null }],
+    predictions: { x: { A1: { home: 1, away: 0 } } },
+    resetVersions: { me: 1 },
+  });
+
+  await page.locator('.nav-tab[data-view="compare"]').click();
+  const card = page.locator('#view-compare .compare-card[data-uid="x"]');
+  await expect(card).toContainText('Sem nome');
+  await expect(card).not.toContainText('null');
 });
