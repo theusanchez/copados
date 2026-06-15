@@ -31,7 +31,7 @@ test('a saved group prediction round-trips into the standings', async ({ page })
   await expect(page.locator('#standings-A .standings-table')).toContainText('México');
 });
 
-test('a fully-filled user opens on the compare tab', async ({ page }) => {
+test('a fully-filled user opens on the fixtures tab', async ({ page }) => {
   await boot(page, {
     currentUser: user('me', 'Eu Mesmo'),
     users: [user('me', 'Eu Mesmo')],
@@ -39,5 +39,5 @@ test('a fully-filled user opens on the compare tab', async ({ page }) => {
     resetVersions: { me: 1 }, // already migrated → keep the full bolão
   });
 
-  await expect(page.locator('#view-compare')).toBeVisible();
+  await expect(page.locator('#view-fixtures')).toBeVisible();
 });

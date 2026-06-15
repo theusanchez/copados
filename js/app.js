@@ -353,7 +353,7 @@ function showApp() {
   document.getElementById('view-login').classList.add('hidden');
   document.getElementById('view-app').classList.remove('hidden');
   applyGuestUi();
-  const start = !isGuest() && predsComplete(predictions) ? 'compare' : 'groups';
+  const start = predsComplete(predictions) ? 'fixtures' : 'groups';
   switchMainView(start);
 }
 
@@ -376,7 +376,7 @@ function switchMainView(view) {
     renderGuestGate(document.getElementById(`view-${view}`), view);
     return;
   }
-  if (view === 'fixtures') renderFixturesView();
+  if (view === 'fixtures') renderFixturesView({ scroll: true });
   if (view === 'compare') renderCompareView();
   if (view === 'ranking') renderRankingView();
   if (view === 'leagues') renderLeaguesView();
@@ -914,10 +914,18 @@ function fixtureList() {
   return items.filter(i => i.ms != null).sort((a, b) => a.ms - b.ms);
 }
 
-function renderFixturesView() {
+// The fixture to surface when opening Jogos: the one in play now, else the next
+// to start. items are sorted by kickoff, so the first non-finished match is it.
+function focusFixtureId(items) {
+  const next = items.find(it => results[it.match.id]?.status !== 'finished');
+  return next ? next.match.id : null;
+}
+
+function renderFixturesView({ scroll = false } = {}) {
   const container = document.getElementById('view-fixtures');
   currentUserKo = resolveKnockout(predictions);
   const items = fixtureList();
+  const focusId = scroll ? focusFixtureId(items) : null;
 
   if (!items.length) {
     container.innerHTML = `
@@ -939,7 +947,7 @@ function renderFixturesView() {
     ${buckets.map(b => `
       <div class="fx-day">
         <h3 class="fx-day-label">${b.label}</h3>
-        ${b.items.map(renderFixtureCard).join('')}
+        ${b.items.map(it => renderFixtureCard(it, it.match.id === focusId)).join('')}
       </div>`).join('')}`;
 
   container.querySelectorAll('.score-input').forEach(input => {
@@ -948,9 +956,14 @@ function renderFixturesView() {
       savePrediction(matchId, side, input.value);
     });
   });
+
+  if (focusId) {
+    container.querySelector(`#fx-match-${focusId}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
-function renderFixtureCard(it) {
+function renderFixtureCard(it, focused = false) {
   const { match, isKnockout, homeTeam, awayTeam, ms } = it;
   const pred = predictions[match.id] || {};
   const hVal = pred.home != null ? pred.home : '';
@@ -978,7 +991,7 @@ function renderFixtureCard(it) {
   }
 
   return `
-    <div class="match-card fx-card${locked ? ' locked' : ''}${live ? ' live' : ''}${live && r?.status === 'paused' ? ' paused' : ''}${resultClass}" id="fx-match-${match.id}">
+    <div class="match-card fx-card${locked ? ' locked' : ''}${live ? ' live' : ''}${live && r?.status === 'paused' ? ' paused' : ''}${focused ? ' fx-focus' : ''}${resultClass}" id="fx-match-${match.id}">
       ${topHtml}
       <div class="match-body">
         <div class="team home-team">

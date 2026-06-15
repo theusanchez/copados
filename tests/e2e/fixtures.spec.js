@@ -71,6 +71,43 @@ test('saving a score in the fixtures view syncs to the groups view', async ({ pa
     .toHaveValue('3');
 });
 
+test('opening Jogos focuses the next match to start (skipping finished ones)', async ({ page }) => {
+  const now = Date.now();
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [user('me', 'Eu')],
+    predictions: {},
+    results: {
+      A1: { status: 'finished', home: 1, away: 0, homeTeam: 'México', awayTeam: 'África do Sul', kickoff: now - 2 * HOUR },
+      B1: { status: 'scheduled', homeTeam: 'Canadá', awayTeam: 'Bósnia e Herzegovina', kickoff: now + 1 * HOUR },
+      A2: { status: 'scheduled', homeTeam: 'Coreia do Sul', awayTeam: 'República Tcheca', kickoff: now + 1 * DAY },
+    },
+  });
+  await openFixtures(page);
+
+  await expect(page.locator('#fx-match-B1')).toHaveClass(/\bfx-focus\b/);
+  await expect(page.locator('#fx-match-A1')).not.toHaveClass(/\bfx-focus\b/);
+  await expect(page.locator('#fx-match-A2')).not.toHaveClass(/\bfx-focus\b/);
+});
+
+test('opening Jogos focuses the live match when one is in play', async ({ page }) => {
+  await enableLive(page);
+  const now = Date.now();
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [user('me', 'Eu')],
+    predictions: {},
+    results: {
+      A1: { status: 'finished', home: 1, away: 0, homeTeam: 'México', awayTeam: 'África do Sul', kickoff: now - 2 * HOUR },
+      B1: { status: 'live', home: 0, away: 0, homeTeam: 'Canadá', awayTeam: 'Bósnia e Herzegovina', kickoff: now },
+      A2: { status: 'scheduled', homeTeam: 'Coreia do Sul', awayTeam: 'República Tcheca', kickoff: now + 1 * DAY },
+    },
+  });
+  await openFixtures(page);
+
+  await expect(page.locator('#fx-match-B1')).toHaveClass(/\bfx-focus\b/);
+});
+
 test('a live match in the fixtures list shows the AO VIVO badge', async ({ page }) => {
   await enableLive(page);
   await boot(page, {

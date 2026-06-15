@@ -502,6 +502,21 @@ main {
   border-color: var(--red);
 }
 
+/* Briefly highlight the match you're sent to when opening Jogos. */
+.match-card.fx-focus {
+  animation: fx-focus-flash 2s ease-out 1;
+}
+
+@keyframes fx-focus-flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 2px var(--primary);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
 /* Halftime: amber, steady (no pulse). */
 .match-card.paused {
   border-color: var(--amber);
