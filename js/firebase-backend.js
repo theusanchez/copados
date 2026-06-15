@@ -91,10 +91,12 @@ export function createFirebaseBackend() {
       // Guests (anonymous) stay out of the `users` collection so they never show
       // up in ranking/compare. On upgrade the uid persists and they get saved.
       if (user.isAnonymous) return;
+      // Don't persist email: this doc is readable by every signed-in user
+      // (ranking/compare need displayName + photoURL), so email would leak as PII.
+      // Firebase Auth already holds the email for the account owner.
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
         displayName: user.displayName,
-        email: user.email,
         photoURL: user.photoURL,
         updatedAt: serverTimestamp(),
       }, { merge: true });

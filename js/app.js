@@ -51,11 +51,18 @@ function formatKickoff(kickoff) {
   return KICKOFF_FMT.format(new Date(ms)).replace(/\./g, '');
 }
 
+// Escape user-controlled text (display names, league names) before it goes into
+// innerHTML — prevents stored XSS from a malicious displayName / league name.
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 // Google/Firebase avatars 403 when a Referer is sent — no-referrer + initials fallback.
 function avatarHtml(user, cls) {
-  const initial = user.displayName?.[0] || '?';
+  const initial = escapeHtml(user.displayName?.[0] || '?');
   return user.photoURL
-    ? `<img src="${user.photoURL}" alt="${user.displayName}" class="${cls}"
+    ? `<img src="${escapeHtml(user.photoURL)}" alt="${escapeHtml(user.displayName)}" class="${cls}"
         referrerpolicy="no-referrer" data-initial="${initial}" data-ph="${cls}-placeholder">`
     : `<div class="${cls}-placeholder">${initial}</div>`;
 }
@@ -449,9 +456,9 @@ function renderUserInfo() {
   if (!currentUser) return;
   const el = document.getElementById('user-info');
   const photo = currentUser.photoURL
-    ? `<img src="${currentUser.photoURL}" alt="${currentUser.displayName}" class="avatar" referrerpolicy="no-referrer" onerror="this.remove()">`
+    ? `<img src="${escapeHtml(currentUser.photoURL)}" alt="${escapeHtml(currentUser.displayName)}" class="avatar" referrerpolicy="no-referrer" onerror="this.remove()">`
     : '';
-  el.innerHTML = `${photo}<span class="user-name">${currentUser.displayName}</span>`;
+  el.innerHTML = `${photo}<span class="user-name">${escapeHtml(currentUser.displayName)}</span>`;
 }
 
 // -----------------------------------------------------------------------
@@ -1147,9 +1154,9 @@ function compareCardHtml(entry) {
   const isMe = currentUser && user.uid === currentUser.uid;
   return `
     <button class="compare-card${isMe ? ' compare-card-me' : ''}"
-      data-uid="${user.uid}" aria-label="Comparar com ${user.displayName}">
+      data-uid="${user.uid}" aria-label="Comparar com ${escapeHtml(user.displayName)}">
       ${avatarHtml(user, 'compare-avatar')}
-      <div class="compare-name">${user.displayName}${isMe ? ' (eu)' : ''}</div>
+      <div class="compare-name">${escapeHtml(user.displayName)}${isMe ? ' (eu)' : ''}</div>
       <div class="compare-champion">
         <span class="champion-flag">${flag(champion)}</span>
         <span class="champion-name">${champion}</span>
@@ -1177,7 +1184,7 @@ function renderComparison(me, them) {
   const detail = document.getElementById('compare-detail');
   if (!detail) return;
   const myName = 'Você';
-  const themName = them.user.displayName;
+  const themName = escapeHtml(them.user.displayName);
 
   // --- Groups: shared fixtures, two stacked score rows ---
   const groupsHtml = Object.keys(GROUPS).map(g => {
@@ -1285,8 +1292,9 @@ function renderComparison(me, them) {
 // Short, shareable codes that avoid easily-confused characters (0/O, 1/I).
 function generateCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
   let code = '';
-  for (let i = 0; i < 6; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  for (let i = 0; i < 6; i++) code += alphabet[bytes[i] % alphabet.length];
   return code;
 }
 
@@ -1337,7 +1345,7 @@ async function consumeJoinLink() {
 
 function leagueSwitcherHtml() {
   const opts = [{ id: 'geral', name: 'Geral' }, ...userLeagues]
-    .map(l => `<option value="${l.id}"${l.id === activeLeagueId ? ' selected' : ''}>${l.name}</option>`)
+    .map(l => `<option value="${l.id}"${l.id === activeLeagueId ? ' selected' : ''}>${escapeHtml(l.name)}</option>`)
     .join('');
   return `<label class="league-switch">
       <span class="league-switch-label">Liga:</span>
@@ -1360,7 +1368,7 @@ function renderLeaguesView() {
     const count = l.memberUids.length;
     return `<div class="league-card${isActive ? ' active' : ''}">
         <div class="league-card-head">
-          <span class="league-card-name">${l.name}</span>
+          <span class="league-card-name">${escapeHtml(l.name)}</span>
           ${isActive
             ? '<span class="league-badge">Ativa</span>'
             : `<button class="league-activate" data-id="${l.id}" type="button">Ativar</button>`}
@@ -1563,7 +1571,7 @@ async function renderRankingView() {
         ${movementChip(e, !!prevResults)}
         ${avatarHtml(e.user, 'ranking-avatar')}
         <div class="ranking-info">
-          <span class="ranking-name">${e.user.displayName}${isMe ? ' (eu)' : ''}</span>
+          <span class="ranking-name">${escapeHtml(e.user.displayName)}${isMe ? ' (eu)' : ''}</span>
           <span class="ranking-stats">${e.exact} cravadas · ${e.correct} resultados</span>
           ${badgesFor(e, isLeader, isRoundTop)}
         </div>

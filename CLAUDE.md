@@ -66,7 +66,9 @@ When you add a backend method, add it to **all three**: `firebase-backend.js`,
 
 ## Firestore data model
 
-- `users/{uid}` — `{ uid, displayName, email, photoURL, knockoutResetVersion }`.
+- `users/{uid}` — `{ uid, displayName, photoURL, knockoutResetVersion }`. **No `email`**
+  here on purpose: every signed-in user can read this doc (ranking/compare), so email
+  would leak as PII. Auth keeps the email; don't reintroduce it into the doc.
 - `predictions/{uid}/matches/{matchId}` — `{ home, away, penWinner? }`.
 - `results/{matchId}` — `{ status, home, away, homeTeam, awayTeam, kickoff, penWinner? }`
   written by the ingester. `status` ∈ `scheduled | live | paused | finished`.
@@ -110,4 +112,8 @@ Knockout only scores when the predicted matchup equals the real one.
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `test:`, `perf:`, `ci:`, `docs:`).
 - Surgical changes; match existing patterns; no dead code / commented-out blocks.
 - Pure logic goes in `engine.js` / `venues.js` (testable); DOM/rendering in `app.js`.
+- **Always `escapeHtml()` user-controlled text** (display names, league names) before
+  it goes into `innerHTML` — it renders to every other user in compare/ranking, so a
+  raw value is stored XSS. Security rules live in `firestore.rules` (versioned); deploy
+  with `firebase deploy --only firestore:rules`.
 - Every user-facing change should ship with an E2E spec; run the suite before pushing.

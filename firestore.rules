@@ -1,0 +1,54 @@
+rules_version = '2';
+
+// Security rules for the Copa 2026 — Palpites bolão.
+//
+// This is a public client-side app, so these rules are the ONLY thing protecting
+// the data. Deploy with `firebase deploy --only firestore:rules` (or paste into
+// the console: Firestore Database > Rules) and test in the Rules Playground.
+//
+// Model: any signed-in user can READ profiles, predictions and results (ranking
+// and compare show everyone), but a user can only WRITE their own data. Results
+// are written exclusively by the ingester (Admin SDK bypasses these rules), never
+// by a client.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function notGuest() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Public-ish profile: displayName + photoURL only (no email — see saveUser).
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if owner(uid) && notGuest();
+    }
+
+    // A user only ever writes their own predictions.
+    match /predictions/{uid}/matches/{matchId} {
+      allow read: if signedIn();
+      allow write: if owner(uid);
+    }
+
+    // Match results are read-only for clients; only the Admin SDK (ingester) writes.
+    match /results/{matchId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Leagues: the owner manages the league; anyone can join by adding ONLY
+    // themselves to memberUids (nothing else may change on a join).
+    match /leagues/{leagueId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow update: if signedIn() && (
+        resource.data.ownerUid == request.auth.uid ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
+          && request.auth.uid in request.resource.data.memberUids
+          && !(request.auth.uid in resource.data.memberUids))
+      );
+    }
+  }
+}

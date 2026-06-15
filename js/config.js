@@ -2,14 +2,10 @@
 // 1. Acesse https://console.firebase.google.com/
 // 2. Crie um projeto > Adicionar app Web (ícone </> na tela inicial)
 // 3. Cole o config aqui
-// 4. Ative: Authentication > Google | Firestore Database (modo teste)
-// 5. Em Firestore > Regras, use:
-//    rules_version = '2';
-//    service cloud.firestore {
-//      match /databases/{database}/documents {
-//        match /{document=**} { allow read, write: if request.auth != null; }
-//      }
-//    }
+// 4. Ative: Authentication > Google | Firestore Database
+// 5. Em Firestore > Regras, use o conteúdo de `firestore.rules` (na raiz do repo).
+//    NÃO use `allow read, write: if request.auth != null` — libera tudo pra
+//    qualquer logado. Deploy: `firebase deploy --only firestore:rules`.
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
