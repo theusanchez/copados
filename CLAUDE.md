@@ -6,8 +6,12 @@ Guide for AI assistants (and humans) working in this repo. Read this first.
 
 **Copa 2026 — Palpites**: a World Cup 2026 prediction-pool (bolão) PWA. Users predict
 every match scoreline (group stage + knockout), compare with friends, and climb a
-ranking. Deployed as a static site on **GitHub Pages from `main`**
-(`https://theusanchez.github.io/copados`).
+ranking. Deployed as a static site from `main` to two hosts that mirror each other:
+**Vercel** (primary, `https://copados.vercel.app`, root-domain) and **GitHub Pages**
+(fallback, `https://theusanchez.github.io/copados`, `/copados` subpath). All asset
+paths are relative so the same build serves both root and subpath — keep it that way.
+`vercel.json` pins a no-build static deploy (the `package.json` is dev-only/Playwright).
+Both new domains must be in Firebase **Authorized domains** or auth breaks.
 
 ## Stack
 
