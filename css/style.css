@@ -1,29 +1,77 @@
 /* ================================================================
    CSS Variables
    ================================================================ */
-/* Default theme = "Clássico" (the original dark palette). Other themes override
-   these tokens via html[data-theme="..."] blocks below. Everything visual keys off
-   this token set, so a theme is just a different set of values here. */
+/* Default theme = a refined "ink + emerald + gold" dark palette. Everything visual
+   keys off this token set, so a theme is just a different set of values. Structural
+   tokens (fonts, radii, spacing, elevation) live here and are inherited by every
+   theme; theme blocks below override only colors. The original GitHub-dark look is
+   preserved as the selectable "Clássico" theme. */
 :root {
+  --bg: #0b0d12;
+  --surface: #13161e;
+  --card: #1a1e29;
+  --border: #2a3040;
+  --primary: #6d8bff; /* periwinkle accent for interactive bits */
+  --gold: #f3c34e; /* highlights, logo, 1st place */
+  --green: #34d17a; /* success / points gained */
+  --amber: #f3b14e;
+  --red: #ef5a6f; /* softened — used sparingly, never for "0 points" */
+  --text: #eef1f8;
+  --subtext: #99a2b6;
+  --on-green: #05231a; /* text on solid-green buttons */
+  --rank-2: #c6cfdf; /* silver */
+  /* Derived tokens (color-mix) auto-adapt to every theme below: */
+  --card-2: color-mix(
+    in srgb,
+    var(--card),
+    white 6%
+  ); /* nested/raised surface */
+  --primary-strong: color-mix(
+    in srgb,
+    var(--primary),
+    black 14%
+  ); /* hover/active */
+  --rank-1: var(--gold); /* 1st place */
+  --rank-3: color-mix(in srgb, var(--gold), #c2643a 72%); /* bronze */
+  --surface-raised: rgba(
+    255,
+    255,
+    255,
+    0.035
+  ); /* faint lift on dark surfaces */
+  --hairline: rgba(255, 255, 255, 0.07); /* subtle divider */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Sora", system-ui, sans-serif; /* headings, scores, numbers */
+  --radius: 14px;
+  --radius-sm: 9px;
+  --radius-lg: 22px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--primary) 40%, transparent);
+  --transition: 0.18s ease;
+}
+
+/* ----- Clássico: the original GitHub-dark palette ----- */
+html[data-theme="classico"] {
   --bg: #0d1117;
   --surface: #161b22;
   --card: #21262d;
+  --card-2: #2a313b;
   --border: #30363d;
   --primary: #58a6ff;
+  --primary-strong: #4592ee;
   --gold: #d29922;
   --green: #3fb950;
   --amber: #e3b341;
   --red: #f85149;
   --text: #e6edf3;
   --subtext: #8b949e;
-  --on-green: #06210f; /* text on solid-green buttons */
-  --rank-2: #4fc4f1; /* 2nd-place accent in standings */
-  --surface-raised: rgba(255, 255, 255, 0.03); /* faint lift on dark surfaces */
-  --hairline: rgba(48, 54, 61, 0.5); /* subtle divider */
-  --radius: 8px;
-  --radius-sm: 4px;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  --transition: 0.2s ease;
+  --on-green: #06210f;
+  --rank-1: #d29922;
+  --rank-2: #4fc4f1;
+  --rank-3: #c97f4f;
+  --surface-raised: rgba(255, 255, 255, 0.03);
+  --hairline: rgba(48, 54, 61, 0.5);
 }
 
 /* ----- Verde & Ouro: festive World-Cup dark (green + gold) ----- */
@@ -133,15 +181,27 @@ html {
 }
 
 body {
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Display font for titles, scores and standalone numbers. */
+.header-logo,
+.login-title,
+.fx-day-label,
+.md-label,
+.standings-table th,
+.compare-header h2,
+.score-input,
+.fx-score,
+.live-score {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 button {
@@ -198,25 +258,67 @@ img {
 }
 
 .login-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 3rem 2rem;
+  border-radius: var(--radius-lg);
+  padding: 2.75rem 2rem;
   max-width: 400px;
   width: 100%;
   box-shadow: var(--shadow);
+  overflow: hidden;
+}
+/* Soft glow at the top of the card for some identity. */
+.login-card::before {
+  content: "";
+  position: absolute;
+  top: -45%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120%;
+  height: 80%;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--primary) 22%, transparent),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+.login-card > * {
+  position: relative;
 }
 
 .login-logo {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-  display: block;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin: 0 auto 1.25rem;
+  font-size: 2.6rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 25%,
+    color-mix(in srgb, var(--gold) 30%, var(--card-2)),
+    var(--card-2)
+  );
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--gold) 45%, transparent),
+    0 8px 24px -8px color-mix(in srgb, var(--gold) 40%, transparent);
 }
 
 .login-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(
+    180deg,
+    var(--text),
+    color-mix(in srgb, var(--gold) 65%, var(--text))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
   margin-bottom: 0.5rem;
 }
 
@@ -411,12 +513,46 @@ header {
 }
 
 .header-logo {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--gold);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   white-space: nowrap;
   text-decoration: none;
   flex-shrink: 0;
+}
+.logo-badge {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 1rem;
+  background: radial-gradient(
+    circle at 30% 25%,
+    color-mix(in srgb, var(--gold) 35%, var(--card-2)),
+    var(--card-2)
+  );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--gold) 45%, transparent),
+    var(--shadow-sm);
+}
+.logo-word {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  background: linear-gradient(
+    180deg,
+    var(--text),
+    color-mix(in srgb, var(--gold) 55%, var(--text))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.logo-word b {
+  color: var(--gold);
+  -webkit-text-fill-color: var(--gold);
 }
 
 .nav-tabs {
@@ -575,13 +711,19 @@ main {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
   overflow: hidden;
-  transition: border-color var(--transition);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition),
+    transform var(--transition),
+    box-shadow var(--transition);
 }
 
 .match-card:hover {
-  border-color: var(--subtext);
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
 }
 
 .match-kickoff {
@@ -720,16 +862,19 @@ main {
 }
 
 .score-input {
-  width: 48px;
-  height: 40px;
+  width: 50px;
+  height: 46px;
   text-align: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--card-2);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  transition: border-color var(--transition);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    background var(--transition);
   -moz-appearance: textfield;
 }
 
@@ -739,9 +884,15 @@ main {
   margin: 0;
 }
 
+.score-input:hover:not([readonly]) {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
 .score-input:focus {
   outline: none;
   border-color: var(--primary);
+  background: var(--surface);
+  box-shadow: var(--ring);
 }
 
 .score-input[readonly] {
@@ -1609,30 +1760,33 @@ main {
   border-radius: var(--radius-sm);
 }
 .pts-exact {
-  color: #fff;
+  color: var(--on-green);
   background: var(--green);
 }
 .pts-partial {
   color: var(--green);
-  background: rgba(63, 185, 80, 0.2);
+  background: color-mix(in srgb, var(--green) 20%, transparent);
 }
 .pts-zero {
-  color: #fff;
-  background: var(--red);
+  /* A missed prediction is not an error — neutral chip, never red. */
+  color: var(--subtext);
+  background: var(--surface-raised);
 }
 
-/* Outcome tint on the whole card once a match is finished. */
+/* Outcome tint on the whole card once a match is finished. Green celebrates a hit;
+   a miss stays calm and neutral (no punishing red). */
 .match-card.result-exact {
-  background: rgba(63, 185, 80, 0.22);
-  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 13%, var(--card));
+  border-color: color-mix(in srgb, var(--green) 55%, var(--border));
 }
 .match-card.result-partial {
-  background: rgba(63, 185, 80, 0.1);
-  border-color: rgba(63, 185, 80, 0.5);
+  background: color-mix(in srgb, var(--green) 6%, var(--card));
+  border-color: color-mix(in srgb, var(--green) 28%, var(--border));
 }
 .match-card.result-miss {
-  background: rgba(248, 81, 73, 0.12);
-  border-color: rgba(248, 81, 73, 0.5);
+  background: var(--card);
+  border-color: var(--border);
+  opacity: 0.9;
 }
 
 /* ================================================================
@@ -1809,10 +1963,13 @@ main {
     z-index: 100;
     gap: 0;
     justify-content: space-around;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    padding: 0.2rem max(0.25rem, env(safe-area-inset-right))
-      calc(0.2rem + env(safe-area-inset-bottom))
+    background: color-mix(in srgb, var(--surface) 85%, transparent);
+    backdrop-filter: saturate(140%) blur(12px);
+    -webkit-backdrop-filter: saturate(140%) blur(12px);
+    border-top: 1px solid var(--hairline);
+    box-shadow: 0 -8px 24px -16px rgba(0, 0, 0, 0.7);
+    padding: 0.3rem max(0.25rem, env(safe-area-inset-right))
+      calc(0.3rem + env(safe-area-inset-bottom))
       max(0.25rem, env(safe-area-inset-left));
   }
   .nav-tab {
@@ -1821,17 +1978,26 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
-    padding: 0.3rem 0.1rem;
+    gap: 3px;
+    padding: 0.35rem 0.1rem;
     border-radius: var(--radius-sm);
+    color: var(--subtext);
   }
+  /* Active tab: pill behind the icon + accent color, no full-width bg. */
   .nav-tab.active {
     background: none;
+    color: var(--primary);
+  }
+  .nav-tab.active .nav-icon {
+    background: color-mix(in srgb, var(--primary) 16%, transparent);
   }
   .nav-icon {
     display: block;
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     line-height: 1;
+    padding: 0.2rem 0.85rem;
+    border-radius: 999px;
+    transition: background var(--transition);
   }
   .nav-label {
     font-size: 0.56rem;

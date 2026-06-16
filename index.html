@@ -30,6 +30,13 @@
     />
     <meta name="apple-mobile-web-app-title" content="Copa 2026" />
 
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
     <script>
       // Apply the saved theme before first paint so there's no flash of the default.
       try {
@@ -171,7 +178,10 @@
        ============================================================ -->
     <div id="view-app" class="hidden" aria-live="polite">
       <header role="banner">
-        <span class="header-logo" aria-label="Copa 2026">⚽ Copa 2026</span>
+        <span class="header-logo" aria-label="Copa 2026">
+          <span class="logo-badge" aria-hidden="true">⚽</span>
+          <span class="logo-word">Copa<b>26</b></span>
+        </span>
 
         <nav class="nav-tabs" role="navigation" aria-label="Seções principais">
           <button class="nav-tab" data-view="fixtures" type="button">
