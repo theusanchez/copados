@@ -30,6 +30,14 @@
     />
     <meta name="apple-mobile-web-app-title" content="Copa 2026" />
 
+    <script>
+      // Apply the saved theme before first paint so there's no flash of the default.
+      try {
+        var t = localStorage.getItem("theme");
+        if (t) document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
@@ -111,6 +119,49 @@
           Entrar como convidado
         </button>
 
+        <div class="theme-picker" role="group" aria-label="Escolher tema">
+          <button
+            class="theme-swatch"
+            type="button"
+            data-theme-value="classico"
+            title="Clássico"
+            aria-label="Tema Clássico"
+            style="--sw1: #0d1117; --sw2: #58a6ff"
+          ></button>
+          <button
+            class="theme-swatch"
+            type="button"
+            data-theme-value="copa"
+            title="Verde & Ouro"
+            aria-label="Tema Verde e Ouro"
+            style="--sw1: #2ea043; --sw2: #e3b341"
+          ></button>
+          <button
+            class="theme-swatch"
+            type="button"
+            data-theme-value="sunset"
+            title="Pôr do Sol"
+            aria-label="Tema Pôr do Sol"
+            style="--sw1: #5a1f5e; --sw2: #ff9e57"
+          ></button>
+          <button
+            class="theme-swatch"
+            type="button"
+            data-theme-value="neon"
+            title="Roxo Neon"
+            aria-label="Tema Roxo Neon"
+            style="--sw1: #22d3ee; --sw2: #c084fc"
+          ></button>
+          <button
+            class="theme-swatch"
+            type="button"
+            data-theme-value="claro"
+            title="Clean Claro"
+            aria-label="Tema Clean Claro"
+            style="--sw1: #ffffff; --sw2: #2f6feb"
+          ></button>
+        </div>
+
         <p id="login-msg" class="login-msg" role="alert" aria-live="polite"></p>
       </div>
     </div>
@@ -151,6 +202,48 @@
 
         <div class="header-user">
           <div id="user-info" aria-live="polite"></div>
+          <div class="theme-picker" role="group" aria-label="Escolher tema">
+            <button
+              class="theme-swatch"
+              type="button"
+              data-theme-value="classico"
+              title="Clássico"
+              aria-label="Tema Clássico"
+              style="--sw1: #0d1117; --sw2: #58a6ff"
+            ></button>
+            <button
+              class="theme-swatch"
+              type="button"
+              data-theme-value="copa"
+              title="Verde & Ouro"
+              aria-label="Tema Verde e Ouro"
+              style="--sw1: #2ea043; --sw2: #e3b341"
+            ></button>
+            <button
+              class="theme-swatch"
+              type="button"
+              data-theme-value="sunset"
+              title="Pôr do Sol"
+              aria-label="Tema Pôr do Sol"
+              style="--sw1: #5a1f5e; --sw2: #ff9e57"
+            ></button>
+            <button
+              class="theme-swatch"
+              type="button"
+              data-theme-value="neon"
+              title="Roxo Neon"
+              aria-label="Tema Roxo Neon"
+              style="--sw1: #22d3ee; --sw2: #c084fc"
+            ></button>
+            <button
+              class="theme-swatch"
+              type="button"
+              data-theme-value="claro"
+              title="Clean Claro"
+              aria-label="Tema Clean Claro"
+              style="--sw1: #ffffff; --sw2: #2f6feb"
+            ></button>
+          </div>
           <button
             id="btn-logout"
             class="btn-logout"

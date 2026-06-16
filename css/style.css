@@ -1,6 +1,9 @@
 /* ================================================================
    CSS Variables
    ================================================================ */
+/* Default theme = "Clássico" (the original dark palette). Other themes override
+   these tokens via html[data-theme="..."] blocks below. Everything visual keys off
+   this token set, so a theme is just a different set of values here. */
 :root {
   --bg: #0d1117;
   --surface: #161b22;
@@ -13,10 +16,104 @@
   --red: #f85149;
   --text: #e6edf3;
   --subtext: #8b949e;
+  --on-green: #06210f; /* text on solid-green buttons */
+  --rank-2: #4fc4f1; /* 2nd-place accent in standings */
+  --surface-raised: rgba(255, 255, 255, 0.03); /* faint lift on dark surfaces */
+  --hairline: rgba(48, 54, 61, 0.5); /* subtle divider */
   --radius: 8px;
   --radius-sm: 4px;
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   --transition: 0.2s ease;
+}
+
+/* ----- Verde & Ouro: festive World-Cup dark (green + gold) ----- */
+html[data-theme="copa"] {
+  --bg: #0a1a10;
+  --surface: #11281a;
+  --card: #173524;
+  --border: #265038;
+  --primary: #2ea043;
+  --gold: #e3b341;
+  --green: #2ea043;
+  --amber: #f0c862;
+  --red: #f0654b;
+  --text: #eafaf0;
+  --subtext: #8fbf9f;
+  --on-green: #04130a;
+  --rank-2: #d6c08a;
+  --surface-raised: rgba(255, 255, 255, 0.04);
+  --hairline: rgba(38, 80, 56, 0.6);
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* ----- Pôr do Sol: warm violet→orange, gradient page background ----- */
+html[data-theme="sunset"] {
+  --bg: #211033;
+  --surface: #2c1542;
+  --card: #381a52;
+  --border: #4d2670;
+  --primary: #ff9e57;
+  --gold: #ffcf5c;
+  --green: #5fd0a0;
+  --amber: #ffb347;
+  --red: #ff5c7a;
+  --text: #fdeefb;
+  --subtext: #c4a3d6;
+  --on-green: #06210f;
+  --rank-2: #ff9ec4;
+  --surface-raised: rgba(255, 255, 255, 0.05);
+  --hairline: rgba(77, 38, 112, 0.6);
+  --shadow: 0 4px 16px rgba(20, 0, 40, 0.5);
+}
+html[data-theme="sunset"] body {
+  background: linear-gradient(
+      160deg,
+      #2b0f47 0%,
+      #5a1f5e 45%,
+      #8f2d52 75%,
+      #c2563f 100%
+    )
+    fixed;
+}
+
+/* ----- Roxo Neon: deep indigo with neon cyan + magenta ----- */
+html[data-theme="neon"] {
+  --bg: #0b0f1f;
+  --surface: #121935;
+  --card: #1a2348;
+  --border: #2a3568;
+  --primary: #22d3ee;
+  --gold: #fcd34d;
+  --green: #34f5c5;
+  --amber: #fbbf24;
+  --red: #fb4d8a;
+  --text: #eaf2ff;
+  --subtext: #8b9bd4;
+  --on-green: #04130d;
+  --rank-2: #c084fc;
+  --surface-raised: rgba(130, 160, 255, 0.06);
+  --hairline: rgba(42, 53, 104, 0.6);
+  --shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+}
+
+/* ----- Clean Claro: light theme ----- */
+html[data-theme="claro"] {
+  --bg: #ffffff;
+  --surface: #f4f6f9;
+  --card: #ffffff;
+  --border: #d7dde5;
+  --primary: #2f6feb;
+  --gold: #c08a1e;
+  --green: #1f9d4d;
+  --amber: #c08a1e;
+  --red: #d83a36;
+  --text: #1b2733;
+  --subtext: #5a6b7b;
+  --on-green: #ffffff;
+  --rank-2: #2898b5;
+  --surface-raised: rgba(27, 39, 51, 0.03);
+  --hairline: rgba(27, 39, 51, 0.1);
+  --shadow: 0 2px 10px rgba(27, 39, 51, 0.1);
 }
 
 /* ================================================================
@@ -194,7 +291,7 @@ img {
 
 .btn-email {
   background: var(--green);
-  color: #06210f;
+  color: var(--on-green);
   border: none;
   border-radius: var(--radius);
   padding: 0.75rem 1.5rem;
@@ -269,7 +366,7 @@ img {
 
 .btn-upgrade {
   background: var(--green);
-  color: #06210f;
+  color: var(--on-green);
   border: none;
   border-radius: var(--radius);
   padding: 0.75rem 1.75rem;
@@ -349,7 +446,7 @@ header {
 }
 .nav-tab.active {
   color: var(--primary);
-  background: rgba(88, 166, 255, 0.1);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 /* Icons are only shown in the mobile bottom bar; desktop keeps text-only tabs. */
@@ -669,7 +766,7 @@ main {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
-  background: rgba(88, 166, 255, 0.04);
+  background: color-mix(in srgb, var(--primary) 4%, transparent);
 }
 
 .pen-label {
@@ -743,11 +840,11 @@ main {
 }
 
 .standings-table tbody tr {
-  border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+  border-bottom: 1px solid var(--hairline);
   transition: background var(--transition);
 }
 .standings-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-raised);
 }
 
 /* Rank highlight colours */
@@ -758,10 +855,10 @@ main {
   color: var(--green);
 }
 .standings-table .rank-2nd td {
-  color: #4fc4f1;
+  color: var(--rank-2);
 }
 .standings-table .rank-2nd td.pts-cell {
-  color: #4fc4f1;
+  color: var(--rank-2);
 }
 .standings-table .rank-3rd-best td {
   color: var(--amber);
@@ -788,7 +885,7 @@ main {
   background: var(--green);
 }
 .rank-2nd-dot {
-  background: #4fc4f1;
+  background: var(--rank-2);
 }
 .rank-3rd-dot {
   background: var(--amber);
@@ -1050,7 +1147,7 @@ main {
 
 .league-card.active {
   border-color: var(--primary);
-  background: rgba(88, 166, 255, 0.08);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 .league-card-head {
@@ -1069,7 +1166,7 @@ main {
   font-size: 0.7rem;
   font-weight: 700;
   color: var(--primary);
-  background: rgba(88, 166, 255, 0.12);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
   border-radius: 999px;
   padding: 0.15rem 0.55rem;
 }
@@ -1807,4 +1904,40 @@ main {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--subtext);
+}
+
+/* ================================================================
+   Theme picker (color swatches)
+   ================================================================ */
+.theme-picker {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#view-login .theme-picker {
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+.theme-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: linear-gradient(135deg, var(--sw1) 0 50%, var(--sw2) 50% 100%);
+  padding: 0;
+  transition:
+    transform var(--transition),
+    border-color var(--transition);
+}
+.theme-swatch:hover {
+  transform: scale(1.12);
+}
+.theme-swatch[aria-pressed="true"] {
+  border-color: var(--text);
+  transform: scale(1.12);
+}
+.theme-swatch:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }

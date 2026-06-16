@@ -344,6 +344,35 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 });
 
 // -----------------------------------------------------------------------
+// Theme picker
+// -----------------------------------------------------------------------
+// The saved theme is applied before paint by an inline script in index.html;
+// here we keep the PWA status-bar color and the swatch "pressed" state in sync,
+// and persist changes. Theme = device preference (localStorage), no Firestore.
+const THEME_COLORS = {
+  classico: '#0d1117',
+  copa: '#0a1a10',
+  sunset: '#2b0f47',
+  neon: '#0b0f1f',
+  claro: '#ffffff',
+};
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem('theme', theme); } catch { /* private mode */ }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta && THEME_COLORS[theme]) meta.content = THEME_COLORS[theme];
+  document.querySelectorAll('.theme-swatch').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.themeValue === theme)));
+}
+
+document.querySelectorAll('.theme-swatch').forEach(btn =>
+  btn.addEventListener('click', () => applyTheme(btn.dataset.themeValue)));
+
+// Sync status-bar color + pressed state with whatever the boot script applied.
+applyTheme(document.documentElement.dataset.theme || 'classico');
+
+// -----------------------------------------------------------------------
 // View switching
 // -----------------------------------------------------------------------
 function hideLoading() {
