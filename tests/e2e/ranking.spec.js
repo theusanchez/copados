@@ -23,6 +23,9 @@ function rows(page) {
   return page.locator('#view-ranking .ranking-row');
 }
 
+// Top 3 render on the podium (data-pos 1..3); positions 4+ are list rows.
+const podium = (page, pos) => page.locator(`#view-ranking .podium-card[data-pos="${pos}"]`);
+
 test('single played round shows round points and no movement (estreia)', async ({ page }) => {
   await boot(page, {
     currentUser: user('me', 'Eu'),
@@ -34,9 +37,9 @@ test('single played round shows round points and no movement (estreia)', async (
 
   await expect(page.locator('.ranking-round-note')).toContainText('Rodada 1 (grupos)');
   // After R1: Bob 8, Eu 8 (tiebreak by name → Bob first), Alice 6.
-  await expect(rows(page).nth(0)).toContainText('Bob');
-  await expect(rows(page).nth(0).locator('.rank-move-flat')).toBeVisible();
-  await expect(rows(page).nth(0).locator('.ranking-round-pts')).toHaveText('+8');
+  await expect(podium(page, 1)).toContainText('Bob');
+  await expect(podium(page, 1).locator('.rank-move-flat')).toBeVisible();
+  await expect(podium(page, 1).locator('.ranking-round-pts')).toHaveText('+8');
 });
 
 test('second round recomputes points and position movement', async ({ page }) => {
@@ -51,18 +54,18 @@ test('second round recomputes points and position movement', async ({ page }) =>
   await expect(page.locator('.ranking-round-note')).toContainText('Rodada 2 (grupos)');
 
   // Final order: Eu 18, Alice 12, Bob 8.
-  const r0 = rows(page).nth(0), r1 = rows(page).nth(1), r2 = rows(page).nth(2);
+  const p1 = podium(page, 1), p2 = podium(page, 2), p3 = podium(page, 3);
 
-  await expect(r0).toContainText('Eu');
-  await expect(r0.locator('.ranking-total')).toContainText('18');
-  await expect(r0.locator('.rank-move-up')).toHaveText('▲1'); // was 2nd after R1
-  await expect(r0.locator('.ranking-round-pts')).toHaveText('+10');
+  await expect(p1).toContainText('Eu');
+  await expect(p1.locator('.podium-total')).toContainText('18');
+  await expect(p1.locator('.rank-move-up')).toHaveText('▲1'); // was 2nd after R1
+  await expect(p1.locator('.ranking-round-pts')).toHaveText('+10');
 
-  await expect(r1).toContainText('Alice');
-  await expect(r1.locator('.rank-move-up')).toHaveText('▲1'); // was 3rd
-  await expect(r1.locator('.ranking-round-pts')).toHaveText('+6');
+  await expect(p2).toContainText('Alice');
+  await expect(p2.locator('.rank-move-up')).toHaveText('▲1'); // was 3rd
+  await expect(p2.locator('.ranking-round-pts')).toHaveText('+6');
 
-  await expect(r2).toContainText('Bob');
-  await expect(r2.locator('.rank-move-down')).toHaveText('▼2'); // was 1st
-  await expect(r2.locator('.ranking-round-pts')).toHaveCount(0); // scored 0 this round
+  await expect(p3).toContainText('Bob');
+  await expect(p3.locator('.rank-move-down')).toHaveText('▼2'); // was 1st
+  await expect(p3.locator('.ranking-round-pts')).toHaveCount(0); // scored 0 this round
 });

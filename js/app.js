@@ -1658,13 +1658,32 @@ async function renderRankingView() {
     prevOrder.forEach((e, i) => { e.prevPos = i + 1; });
   }
 
-  const rowsHtml = curOrder.map(e => {
-    const isMe = currentUser && e.user.uid === currentUser.uid;
+  const roundBadgeFor = (e) => {
     const roundPts = e.total - e.prevTotal;
-    const roundBadge = hasResults && roundPts > 0
+    return hasResults && roundPts > 0
       ? `<span class="ranking-round-pts">+${roundPts}</span>` : '';
-    const isLeader = hasResults && e.pos === 1 && e.total > 0;
-    const isRoundTop = hasResults && maxRoundExact > 0 && e.roundExact === maxRoundExact;
+  };
+  const isLeaderOf = (e) => hasResults && e.pos === 1 && e.total > 0;
+  const isRoundTopOf = (e) => hasResults && maxRoundExact > 0 && e.roundExact === maxRoundExact;
+
+  // Top 3 are shown on a podium (champion raised in the middle); everyone else
+  // is a list row below. Before any result, it's a plain list (no podium).
+  const podiumCard = (e) => {
+    const isMe = currentUser && e.user.uid === currentUser.uid;
+    const medal = ['🥇', '🥈', '🥉'][e.pos - 1] || '';
+    return `
+      <div class="podium-card podium-${e.pos}${isMe ? ' podium-me' : ''}" data-pos="${e.pos}">
+        <span class="podium-medal" aria-hidden="true">${medal}</span>
+        ${avatarHtml(e.user, 'podium-avatar')}
+        <span class="podium-name">${escapeHtml(e.user.displayName)}${isMe ? ' (eu)' : ''}</span>
+        <span class="podium-total">${e.total}<small>pts</small></span>
+        <span class="podium-meta">${movementChip(e, !!prevResults)}${roundBadgeFor(e)}</span>
+        ${badgesFor(e, isLeaderOf(e), isRoundTopOf(e))}
+      </div>`;
+  };
+
+  const rowEntry = (e) => {
+    const isMe = currentUser && e.user.uid === currentUser.uid;
     return `
       <div class="ranking-row${isMe ? ' ranking-row-me' : ''}">
         <span class="ranking-pos">${e.pos}</span>
@@ -1673,11 +1692,19 @@ async function renderRankingView() {
         <div class="ranking-info">
           <span class="ranking-name">${escapeHtml(e.user.displayName)}${isMe ? ' (eu)' : ''}</span>
           <span class="ranking-stats">${e.exact} cravadas · ${e.correct} resultados</span>
-          ${badgesFor(e, isLeader, isRoundTop)}
+          ${badgesFor(e, isLeaderOf(e), isRoundTopOf(e))}
         </div>
-        <span class="ranking-points">${roundBadge}<span class="ranking-total">${e.total}<small>pts</small></span></span>
+        <span class="ranking-points">${roundBadgeFor(e)}<span class="ranking-total">${e.total}<small>pts</small></span></span>
       </div>`;
-  }).join('');
+  };
+
+  const usePodium = hasResults && curOrder.length > 0;
+  const top = usePodium ? curOrder.slice(0, 3) : [];
+  const rest = usePodium ? curOrder.slice(3) : curOrder;
+  const podiumHtml = top.length
+    ? `<div class="podium" data-count="${top.length}">${top.map(podiumCard).join('')}</div>`
+    : '';
+  const rowsHtml = rest.map(rowEntry).join('');
 
   const empty = hasResults ? '' :
     `<p class="ranking-empty">Os jogos ainda não começaram — o ranking aparece assim que os primeiros resultados saírem.</p>`;
@@ -1689,7 +1716,8 @@ async function renderRankingView() {
     <div class="compare-header"><h2>Ranking · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>
     ${empty}
     ${roundNote}
-    <div class="ranking-list">${rowsHtml}</div>
+    ${podiumHtml}
+    ${rowsHtml ? `<div class="ranking-list">${rowsHtml}</div>` : ''}
   `;
 
   attachAvatarFallback(container);
