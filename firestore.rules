@@ -25,7 +25,15 @@ service cloud.firestore {
       allow write: if owner(uid) && notGuest();
     }
 
-    // A user only ever writes their own predictions.
+    // A user only ever writes their own predictions. All of a user's picks live in
+    // a single doc (`predictions/{uid}`, `matches` map) so loading a user is one read.
+    match /predictions/{uid} {
+      allow read: if signedIn();
+      allow write: if owner(uid);
+    }
+
+    // Transitional: the legacy one-doc-per-match layout. Kept readable/writable
+    // while migrating; remove once the migration cleanup has run.
     match /predictions/{uid}/matches/{matchId} {
       allow read: if signedIn();
       allow write: if owner(uid);

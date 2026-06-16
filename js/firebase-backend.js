@@ -8,7 +8,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, updateDoc, getDocs, onSnapshot,
-  collection, query, where, arrayUnion, serverTimestamp, writeBatch,
+  collection, query, where, arrayUnion, serverTimestamp, deleteField,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { firebaseConfig } from './config.js';
 
@@ -22,11 +22,12 @@ export function createFirebaseBackend() {
   const db = getFirestore(app);
   const provider = new GoogleAuthProvider();
 
+  // All of a user's predictions live in a single doc (`predictions/{uid}`) under a
+  // `matches` map, so reading a whole user costs ONE read instead of one-per-match.
+  // This is what keeps ranking/compare (which read every scoped user) within quota.
   async function loadPreds(uid) {
-    const snap = await getDocs(collection(db, 'predictions', uid, 'matches'));
-    const out = {};
-    snap.forEach(d => { out[d.id] = d.data(); });
-    return out;
+    const snap = await getDoc(doc(db, 'predictions', uid));
+    return (snap.exists() && snap.data().matches) || {};
   }
 
   return {
@@ -102,9 +103,11 @@ export function createFirebaseBackend() {
       }, { merge: true });
     },
 
+    // Deep-merge a single match into the `matches` map: only that key changes, the
+    // rest of the user's predictions are untouched. One write per saved score.
     async savePred(uid, matchId, data) {
-      await setDoc(doc(db, 'predictions', uid, 'matches', matchId), {
-        ...data,
+      await setDoc(doc(db, 'predictions', uid), {
+        matches: { [matchId]: data },
         updatedAt: serverTimestamp(),
       }, { merge: true });
     },
@@ -113,9 +116,9 @@ export function createFirebaseBackend() {
     loadUserPreds: loadPreds,
 
     async deletePreds(uid, matchIds) {
-      const batch = writeBatch(db);
-      matchIds.forEach(id => batch.delete(doc(db, 'predictions', uid, 'matches', id)));
-      await batch.commit();
+      const patch = { updatedAt: serverTimestamp() };
+      matchIds.forEach(id => { patch[`matches.${id}`] = deleteField(); });
+      await updateDoc(doc(db, 'predictions', uid), patch);
     },
 
     // Per-user marker for one-off prediction migrations (e.g. the knockout reset).

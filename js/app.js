@@ -226,11 +226,13 @@ onAuthChange(async user => {
   renderProgress();
   renderGroupsView();
   renderKnockoutView();
-  unsubscribeResults = watchResults(applyResultsUpdate);
 
-  // Everything below is best-effort and runs AFTER the app is already on screen.
+  // A single read of the whole results collection is the source of truth on boot.
+  // The real-time listener is attached on demand (syncLiveListener) only while a
+  // match is on/imminent — not held open 24/7 re-reading the collection. Best-effort
+  // and async so a slow Firestore never freezes the loading screen.
   loadResults()
-    .then(r => { results = r || {}; renderProgress(); renderGroupsView(); renderKnockoutView(); })
+    .then(r => { results = r || {}; onResultsLoaded(); })
     .catch(err => console.error('loadResults failed', err));
 
   if (!guest) {
@@ -1066,21 +1068,76 @@ function resultsSignature(r) {
     .join('|');
 }
 
+// Re-render whichever results-dependent tab is currently open. Groups/knockout
+// keep their sub-tab state, so they refresh on reentry, not here.
+function renderActiveResultsView() {
+  const active = document.querySelector('.nav-tab.active')?.dataset.view;
+  if (active === 'fixtures') renderFixturesView({ scroll: fixturesScrollPending });
+  else if (active === 'ranking') renderRankingView();
+  else if (active === 'compare') renderCompareView();
+}
+
+// Initial results read (loadResults on boot) landed: render everything that
+// depends on results, then start the live listener if a match is on/imminent.
+function onResultsLoaded() {
+  renderProgress();
+  renderGroupsView();
+  renderKnockoutView();
+  renderActiveResultsView();
+  syncLiveListener();
+}
+
 // Live results arrive via a Firestore real-time listener (watchResults): instant
 // updates, billed per changed doc, so live scores/badges and finished results show
-// up without a reload and without polling cost. Groups/knockout keep their sub-tab
-// state, so they refresh on reentry; the fixtures view updates in place.
+// up without a reload and without polling cost.
 function applyResultsUpdate(fresh) {
   const changed = resultsSignature(fresh) !== resultsSignature(results);
   results = fresh;
   if (!changed) return;
   // Never rebuild a card the user is currently typing into.
   if (document.activeElement?.classList?.contains('score-input')) return;
-  const active = document.querySelector('.nav-tab.active')?.dataset.view;
-  if (active === 'fixtures') renderFixturesView({ scroll: fixturesScrollPending });
-  else if (active === 'ranking') renderRankingView();
-  else if (active === 'compare') renderCompareView();
+  renderActiveResultsView();
 }
+
+// Start listening to results ~2h before a kickoff and keep it up to ~3.5h after,
+// covering pre-match, the ~2h game, and a delayed FINISHED status from the ingester.
+// Closing the window (after the last match) is handled by the periodic re-check
+// below, not from the listener callback — re-attaching there would recurse, since
+// the fake backend invokes the snapshot callback synchronously on subscribe.
+const LIVE_WINDOW_BEFORE = 2 * 60 * 60 * 1000;
+const LIVE_WINDOW_AFTER = 3.5 * 60 * 60 * 1000;
+
+// True when a match is in play or close enough in time that live updates matter.
+function liveWindowOpen() {
+  const now = Date.now();
+  return Object.values(results).some(r => {
+    if (r?.status === 'live' || r?.status === 'paused') return true;
+    if (r?.status === 'finished') return false;
+    const ms = kickoffMs(r?.kickoff);
+    return ms != null && ms <= now + LIVE_WINDOW_BEFORE && ms >= now - LIVE_WINDOW_AFTER;
+  });
+}
+
+// Attach the real-time results listener only when it can actually do something:
+// live scores enabled, tab visible, and a match on/near now. Otherwise detach.
+// This is what stops idle/backgrounded tabs from re-reading the whole results
+// collection around the clock (the overnight read baseline).
+function syncLiveListener() {
+  const wanted = FEATURES.liveScores
+    && (typeof document === 'undefined' || document.visibilityState === 'visible')
+    && liveWindowOpen();
+  if (wanted && !unsubscribeResults) {
+    unsubscribeResults = watchResults(applyResultsUpdate);
+  } else if (!wanted && unsubscribeResults) {
+    unsubscribeResults();
+    unsubscribeResults = null;
+  }
+}
+
+// Re-evaluate the live window when the tab is shown/hidden and periodically (to
+// catch a scheduled match entering the window without any user interaction).
+document.addEventListener('visibilitychange', syncLiveListener);
+setInterval(syncLiveListener, 5 * 60 * 1000);
 
 // Tick the fixtures lock countdowns once a minute (time-based, no data fetch).
 setInterval(() => {
@@ -1103,13 +1160,21 @@ let compareEntries = [];   // [{ user, preds, koMatches, champion, complete }]
 let rosterCache = null;
 
 async function loadRoster({ force = false } = {}) {
-  if (rosterCache && !force) return rosterCache;
-  // Guard against legacy docs saved with a null/empty displayName so the UI never
-  // renders the literal string "null" for them.
-  const users = (await loadAllUsers()).map(u => ({ ...u, displayName: u.displayName || 'Sem nome' }));
-  const preds = {};
-  await Promise.all(users.map(async u => { preds[u.uid] = await loadUserPreds(u.uid); }));
-  rosterCache = { users, preds };
+  if (force) rosterCache = null;
+  if (!rosterCache) {
+    // Guard against legacy docs saved with a null/empty displayName so the UI never
+    // renders the literal string "null" for them. The user list is cheap (one read
+    // per user); predictions are the expensive part and are fetched lazily below.
+    const users = (await loadAllUsers()).map(u => ({ ...u, displayName: u.displayName || 'Sem nome' }));
+    rosterCache = { users, preds: {} };
+  }
+  // Only the users actually shown (the active league's scope) need their predictions
+  // read. Cached per uid, so switching leagues fetches just the newly-scoped users
+  // and a re-render never re-reads what's already loaded.
+  const scoped = scopeUsers(rosterCache.users);
+  await Promise.all(scoped.map(async u => {
+    if (!rosterCache.preds[u.uid]) rosterCache.preds[u.uid] = await loadUserPreds(u.uid);
+  }));
   return rosterCache;
 }
 

@@ -36,15 +36,23 @@ test('navigating between tabs does not re-read predictions', async ({ page }) =>
 });
 
 test('a live score update re-renders the ranking without re-reading', async ({ page }) => {
-  await boot(page, { currentUser: user('me', 'Eu'), users: USERS, predictions: PREDS, results: {}, resetVersions: { me: 1 } });
+  // A1 starts imminent (not finished) so the live window is open and the listener
+  // is attached — the ranking shows empty until a result is finished.
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: USERS,
+    predictions: PREDS,
+    results: { A1: { status: 'scheduled', homeTeam: 'México', awayTeam: 'África do Sul', kickoff: Date.now() } },
+    resetVersions: { me: 1 },
+  });
 
   await page.locator('.nav-tab[data-view="ranking"]').click();
-  await expect(page.locator('#view-ranking .ranking-empty')).toBeVisible(); // no results yet
+  await expect(page.locator('#view-ranking .ranking-empty')).toBeVisible(); // no finished results yet
   const before = await reads(page);
 
   // Ingester marks A1 finished → the live listener re-renders the ranking.
   await page.evaluate(() => localStorage.setItem('e2e_results', JSON.stringify({
-    A1: { status: 'finished', home: 1, away: 0, homeTeam: 'México', awayTeam: 'África do Sul', kickoff: 1 },
+    A1: { status: 'finished', home: 1, away: 0, homeTeam: 'México', awayTeam: 'África do Sul', kickoff: Date.now() },
   })));
 
   // The empty notice disappears (proves the re-render happened)…
