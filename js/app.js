@@ -15,6 +15,7 @@ let koFillLocked = true;     // true while the group stage is incomplete (blocks
 let userLeagues = [];       // private leagues the current user belongs to
 let activeLeagueId = 'geral'; // 'geral' = everyone; otherwise a private league id
 let unsubscribeResults = null; // active Firestore results listener, if any
+let fixturesScrollPending = false; // login opened Jogos before results loaded; scroll once they arrive
 
 const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
 
@@ -932,14 +933,19 @@ function renderFixturesView({ scroll = false } = {}) {
   const container = document.getElementById('view-fixtures');
   currentUserKo = resolveKnockout(predictions);
   const items = fixtureList();
-  const focusId = scroll ? focusFixtureId(items) : null;
 
   if (!items.length) {
+    // Schedule not loaded yet (results still arriving on login): remember to scroll
+    // to the current/next match once the fixtures land, via applyResultsUpdate.
+    if (scroll) fixturesScrollPending = true;
     container.innerHTML = `
       <div class="compare-header"><h2>Jogos</h2></div>
       <p class="ranking-empty">O calendário aparece aqui assim que os horários dos jogos forem publicados.</p>`;
     return;
   }
+
+  if (scroll) fixturesScrollPending = false;
+  const focusId = scroll ? focusFixtureId(items) : null;
 
   const buckets = [];
   items.forEach(it => {
@@ -1042,7 +1048,7 @@ function applyResultsUpdate(fresh) {
   // Never rebuild a card the user is currently typing into.
   if (document.activeElement?.classList?.contains('score-input')) return;
   const active = document.querySelector('.nav-tab.active')?.dataset.view;
-  if (active === 'fixtures') renderFixturesView();
+  if (active === 'fixtures') renderFixturesView({ scroll: fixturesScrollPending });
   else if (active === 'ranking') renderRankingView();
   else if (active === 'compare') renderCompareView();
 }

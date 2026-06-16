@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { boot, user, enableLive } from './helpers.js';
+import { boot, user, enableLive, fullPreds } from './helpers.js';
 
 const HOUR = 3600000;
 const DAY = 86400000;
@@ -106,6 +106,24 @@ test('opening Jogos focuses the live match when one is in play', async ({ page }
   await openFixtures(page);
 
   await expect(page.locator('#fx-match-B1')).toHaveClass(/\bfx-focus\b/);
+});
+
+test('logging in with complete preds lands on Jogos focused on the next match', async ({ page }) => {
+  const now = Date.now();
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [user('me', 'Eu')],
+    predictions: { me: fullPreds() },
+    results: {
+      A1: { status: 'finished', home: 1, away: 0, homeTeam: 'México', awayTeam: 'África do Sul', kickoff: now - 2 * HOUR },
+      B1: { status: 'scheduled', homeTeam: 'Canadá', awayTeam: 'Bósnia e Herzegovina', kickoff: now + 1 * HOUR },
+    },
+  });
+
+  // No openFixtures() click: the focus must happen on login alone.
+  await expect(page.locator('.nav-tab[data-view="fixtures"]')).toHaveClass(/\bactive\b/);
+  await expect(page.locator('#fx-match-B1')).toHaveClass(/\bfx-focus\b/);
+  await expect(page.locator('#fx-match-A1')).not.toHaveClass(/\bfx-focus\b/);
 });
 
 test('a live match in the fixtures list shows the AO VIVO badge', async ({ page }) => {
