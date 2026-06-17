@@ -430,8 +430,10 @@ function applyGuestUi() {
 function switchMainView(view) {
   // Non-admins can never land on the admin view (the tab is hidden, but guard anyway).
   if (view === 'admin' && !isAdmin()) view = 'groups';
+  // Optional chaining so a stale cached index.html (missing a newly-added view,
+  // e.g. view-admin) can't crash the boot — the SW serves fresh HTML on next load.
   ['fixtures', 'groups', 'knockout', 'ranking', 'leagues', 'admin'].forEach(v => {
-    document.getElementById(`view-${v}`).classList.toggle('hidden', v !== view);
+    document.getElementById(`view-${v}`)?.classList.toggle('hidden', v !== view);
   });
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.view === view);
