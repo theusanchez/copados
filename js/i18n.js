@@ -32,10 +32,12 @@ const DICT = {
     'err.auth/invalid-email': 'E-mail inválido.',
     'err.auth/weak-password': 'A senha precisa ter pelo menos 6 caracteres.',
     'err.auth/wrong-password': 'Senha incorreta.',
+    'err.auth/invalid-credential': 'E-mail ou senha incorretos.',
     'err.auth/user-not-found': 'Conta não encontrada.',
+    'err.auth/too-many-requests': 'Muitas tentativas — tente novamente em instantes.',
     'err.auth/popup-closed-by-user': 'Login cancelado.',
     'err.auth/credential-already-in-use': 'Esta conta Google já está em uso. Saia e entre com ela.',
-    'err.generic': 'Algo deu errado. Tente de novo.',
+    'err.generic': 'Algo deu errado. Tente novamente.',
 
     // --- progress ---
     'progress.complete': '✓ Bolão completo — boa sorte!',
@@ -43,7 +45,8 @@ const DICT = {
     'progress.detail': 'Grupos {group}/{groupTotal} · Mata-mata {ko}/{koTotal}',
 
     // --- knockout reset notice ---
-    'reset.text': '⚠️ Corrigimos um erro no chaveamento do <strong>mata-mata</strong>. Seus palpites do mata-mata foram zerados — preencha de novo, por favor.',
+    'reset.text': '⚠️ Corrigimos um erro no chaveamento do <strong>mata-mata</strong>. Seus palpites dessa fase foram resetados — por favor, <strong>preencha novamente</strong>.',
+    'reset.close': 'Fechar aviso',
 
     // --- guest gate ---
     'guest.ranking': 'o ranking',
@@ -51,6 +54,10 @@ const DICT = {
     'guest.compare': 'a comparação de palpites',
     'guest.body': 'Você está como <strong>convidado</strong>. Seus palpites já estão salvos — crie uma conta para entrar no ranking e comparar com a galera. Você não perde nada.',
     'guest.password': 'Senha (mín. 6 caracteres)',
+    'guest.heading': 'Crie sua conta para ver {what}',
+    'guest.create': 'Criar minha conta',
+    'guest.google': 'Usar minha conta Google',
+    'guest.fill': 'Preencha e-mail e senha.',
 
     // --- groups / standings ---
     'groups.matchday': 'Rodada {n}',
@@ -137,7 +144,9 @@ const DICT = {
     'err.auth/invalid-email': 'Invalid e-mail.',
     'err.auth/weak-password': 'Password must be at least 6 characters.',
     'err.auth/wrong-password': 'Wrong password.',
+    'err.auth/invalid-credential': 'Wrong e-mail or password.',
     'err.auth/user-not-found': 'Account not found.',
+    'err.auth/too-many-requests': 'Too many attempts — try again shortly.',
     'err.auth/popup-closed-by-user': 'Sign-in cancelled.',
     'err.auth/credential-already-in-use': 'This Google account is already in use. Log out and sign in with it.',
     'err.generic': 'Something went wrong. Try again.',
@@ -147,12 +156,17 @@ const DICT = {
     'progress.detail': 'Groups {group}/{groupTotal} · Knockout {ko}/{koTotal}',
 
     'reset.text': '⚠️ We fixed a bug in the <strong>knockout</strong> bracket. Your knockout picks were reset — please fill them in again.',
+    'reset.close': 'Dismiss notice',
 
     'guest.ranking': 'the ranking',
     'guest.leagues': 'the leagues',
     'guest.compare': 'the prediction comparison',
     'guest.body': "You're playing as a <strong>guest</strong>. Your picks are already saved — create an account to join the ranking and compare with everyone. You won't lose anything.",
     'guest.password': 'Password (min. 6 characters)',
+    'guest.heading': 'Create your account to see {what}',
+    'guest.create': 'Create my account',
+    'guest.google': 'Use my Google account',
+    'guest.fill': 'Fill in e-mail and password.',
 
     'groups.matchday': 'Matchday {n}',
     'standings.aria': 'Group {group} standings',

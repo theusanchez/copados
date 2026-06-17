@@ -149,10 +149,10 @@ function renderProgress() {
   el.classList.remove('hidden');
   el.classList.toggle('complete', complete);
   el.innerHTML = complete
-    ? `<div class="progress-row"><span class="progress-msg">✓ Bolão completo — boa sorte!</span></div>`
+    ? `<div class="progress-row"><span class="progress-msg">${t('progress.complete')}</span></div>`
     : `<div class="progress-row">
-        <span class="progress-msg">Faltam <strong>${total - done}</strong> de ${total} palpites</span>
-        <span class="progress-detail">Grupos ${c.group}/${c.groupTotal} · Mata-mata ${c.ko}/${c.koTotal}</span>
+        <span class="progress-msg">${t('progress.remaining', { done: total - done, total })}</span>
+        <span class="progress-detail">${t('progress.detail', { group: c.group, groupTotal: c.groupTotal, ko: c.ko, koTotal: c.koTotal })}</span>
       </div>
       <div class="progress-track" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
         <div class="progress-fill" style="width:${pct}%"></div>
@@ -268,11 +268,8 @@ function showResetNotice() {
   const el = document.getElementById('reset-notice');
   if (!el) return;
   el.innerHTML = `
-    <span class="reset-notice-text">
-      ⚠️ Corrigimos um erro no chaveamento do <strong>mata-mata</strong>. Seus palpites
-      dessa fase foram resetados — por favor, <strong>preencha novamente</strong>.
-    </span>
-    <button class="reset-notice-close" type="button" aria-label="Fechar aviso">×</button>`;
+    <span class="reset-notice-text">${t('reset.text')}</span>
+    <button class="reset-notice-close" type="button" aria-label="${t('reset.close')}">×</button>`;
   el.classList.remove('hidden');
   el.querySelector('.reset-notice-close').addEventListener('click', () => {
     el.classList.add('hidden');
@@ -287,18 +284,9 @@ function showLoginMsg(text, ok = false) {
 }
 
 function authErrorText(err) {
-  const map = {
-    'auth/email-already-in-use': 'Este e-mail já tem conta — confira a senha e tente entrar.',
-    'auth/invalid-email': 'E-mail inválido.',
-    'auth/wrong-password': 'Senha incorreta.',
-    'auth/invalid-credential': 'E-mail ou senha incorretos.',
-    'auth/weak-password': 'A senha precisa ter ao menos 6 caracteres.',
-    'auth/user-not-found': 'Conta não encontrada.',
-    'auth/too-many-requests': 'Muitas tentativas — tente novamente em instantes.',
-    'auth/credential-already-in-use': 'Esta conta Google já está em uso. Saia e entre com ela.',
-    'auth/popup-closed-by-user': 'Login cancelado.',
-  };
-  return map[err?.code] || 'Algo deu errado. Tente novamente.';
+  const key = 'err.' + (err?.code || '');
+  const msg = t(key);
+  return msg === key ? t('err.generic') : msg;
 }
 
 document.getElementById('btn-login').addEventListener('click', () => {
@@ -442,20 +430,19 @@ function switchMainView(view) {
 // Shown to a guest in place of a locked social view: a sign-up prompt that
 // promotes the anonymous account (keeping their predictions).
 function renderGuestGate(container, view) {
-  const what = view === 'ranking' ? 'o ranking'
-    : view === 'leagues' ? 'as ligas' : 'a comparação de palpites';
+  const what = view === 'ranking' ? t('guest.ranking')
+    : view === 'leagues' ? t('guest.leagues') : t('guest.compare');
   container.innerHTML = `
     <div class="guest-gate">
       <span class="guest-gate-icon" aria-hidden="true">🔒</span>
-      <h2>Crie sua conta para ver ${what}</h2>
-      <p>Você está como <strong>convidado</strong>. Seus palpites já estão salvos — crie uma
-         conta para entrar no ranking e comparar com a galera. Você não perde nada.</p>
+      <h2>${t('guest.heading', { what })}</h2>
+      <p>${t('guest.body')}</p>
       <form class="email-form guest-upgrade-form" novalidate>
-        <input class="login-input" type="text" autocomplete="name" placeholder="Seu nome" aria-label="Seu nome" />
-        <input class="login-input" type="email" autocomplete="email" placeholder="E-mail" aria-label="E-mail" required />
-        <input class="login-input" type="password" autocomplete="new-password" placeholder="Senha (mín. 6 caracteres)" aria-label="Senha" />
-        <button class="btn-upgrade" type="submit">Criar minha conta</button>
-        <button class="btn-magic" type="button" data-google>Usar minha conta Google</button>
+        <input class="login-input" type="text" autocomplete="name" placeholder="${t('login.name')}" aria-label="${t('login.name')}" />
+        <input class="login-input" type="email" autocomplete="email" placeholder="${t('login.email')}" aria-label="${t('login.email')}" required />
+        <input class="login-input" type="password" autocomplete="new-password" placeholder="${t('guest.password')}" aria-label="${t('guest.password')}" />
+        <button class="btn-upgrade" type="submit">${t('guest.create')}</button>
+        <button class="btn-magic" type="button" data-google>${t('guest.google')}</button>
       </form>
       <p class="login-msg guest-gate-msg" role="alert" aria-live="polite"></p>
     </div>`;
@@ -468,7 +455,7 @@ function renderGuestGate(container, view) {
     const name = nameEl.value.trim();
     const email = emailEl.value.trim();
     const password = passEl.value;
-    if (!email || !password) { msg.textContent = 'Preencha e-mail e senha.'; return; }
+    if (!email || !password) { msg.textContent = t('guest.fill'); return; }
     try {
       const u = await upgradeGuest({ email, password, name: name || email.split('@')[0] });
       await finishUpgrade(u, view);
