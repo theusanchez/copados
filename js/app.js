@@ -1234,9 +1234,9 @@ async function renderCompareView() {
     </section>` : '';
 
   container.innerHTML = `
-    <div class="compare-header"><h2>Palpites · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>
-    ${section('✓ Finalizados', complete)}
-    ${section('⏳ Em andamento', incomplete)}
+    <div class="compare-header"><h2>${t('compare.heading')} · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>
+    ${section(t('compare.complete'), complete)}
+    ${section(t('compare.incomplete'), incomplete)}
     <div id="compare-detail" class="compare-detail hidden"></div>
   `;
 
@@ -1410,7 +1410,7 @@ function getActiveLeague() {
 
 function activeLeagueName() {
   const l = getActiveLeague();
-  return l ? l.name : 'Geral';
+  return l ? l.name : t('leagues.geral');
 }
 
 // Scope ranking/compare to the active league's members; null = everyone.
@@ -1450,12 +1450,12 @@ async function consumeJoinLink() {
 }
 
 function leagueSwitcherHtml() {
-  const opts = [{ id: 'geral', name: 'Geral' }, ...userLeagues]
+  const opts = [{ id: 'geral', name: t('leagues.geral') }, ...userLeagues]
     .map(l => `<option value="${l.id}"${l.id === activeLeagueId ? ' selected' : ''}>${escapeHtml(l.name)}</option>`)
     .join('');
   return `<label class="league-switch">
-      <span class="league-switch-label">Liga:</span>
-      <select class="league-select" aria-label="Liga ativa">${opts}</select>
+      <span class="league-switch-label">${t('leagues.label')}</span>
+      <select class="league-select" aria-label="${t('leagues.activeAria')}">${opts}</select>
     </label>`;
 }
 
@@ -1476,31 +1476,31 @@ function renderLeaguesView() {
         <div class="league-card-head">
           <span class="league-card-name">${escapeHtml(l.name)}</span>
           ${isActive
-            ? '<span class="league-badge">Ativa</span>'
-            : `<button class="league-activate" data-id="${l.id}" type="button">Ativar</button>`}
+            ? `<span class="league-badge">${t('leagues.active')}</span>`
+            : `<button class="league-activate" data-id="${l.id}" type="button">${t('leagues.activate')}</button>`}
         </div>
         <div class="league-card-meta">
-          <span class="league-code">Código <strong>${l.code}</strong></span>
-          <span>${count} ${count === 1 ? 'membro' : 'membros'}</span>
+          <span class="league-code">${t('leagues.code', { code: l.code })}</span>
+          <span>${count} ${count === 1 ? t('leagues.member') : t('leagues.members')}</span>
         </div>
-        <button class="league-copy" data-link="${link}" type="button">Copiar convite</button>
+        <button class="league-copy" data-link="${link}" type="button">${t('leagues.copy')}</button>
       </div>`;
   };
 
   const geralActive = activeLeagueId === 'geral';
   const geralCard = `<div class="league-card${geralActive ? ' active' : ''}">
       <div class="league-card-head">
-        <span class="league-card-name">Geral</span>
+        <span class="league-card-name">${t('leagues.geral')}</span>
         ${geralActive
-          ? '<span class="league-badge">Ativa</span>'
-          : '<button class="league-activate" data-id="geral" type="button">Ativar</button>'}
+          ? `<span class="league-badge">${t('leagues.active')}</span>`
+          : `<button class="league-activate" data-id="geral" type="button">${t('leagues.activate')}</button>`}
       </div>
-      <div class="league-card-meta"><span>Todos os participantes</span></div>
+      <div class="league-card-meta"><span>${t('leagues.everyone')}</span></div>
     </div>`;
 
   container.innerHTML = `
-    <div class="compare-header"><h2>Ligas</h2></div>
-    <p class="league-intro">Crie uma liga privada e compartilhe o convite — o ranking e a comparação passam a contar só entre os membros dela.</p>
+    <div class="compare-header"><h2>${t('nav.leagues')}</h2></div>
+    <p class="league-intro">${t('leagues.intro')}</p>
     <div class="league-list">
       ${geralCard}
       ${userLeagues.map(leagueCard).join('')}
@@ -1508,13 +1508,13 @@ function renderLeaguesView() {
     <div class="league-actions">
       <form class="league-form" id="form-create">
         <input class="league-input" id="input-create" type="text" maxlength="30"
-          placeholder="Nome da nova liga" aria-label="Nome da nova liga" required>
-        <button class="league-btn" type="submit">Criar liga</button>
+          placeholder="${t('leagues.createPlaceholder')}" aria-label="${t('leagues.createPlaceholder')}" required>
+        <button class="league-btn" type="submit">${t('leagues.create')}</button>
       </form>
       <form class="league-form" id="form-join">
         <input class="league-input league-input-code" id="input-join" type="text" maxlength="6"
-          placeholder="Código do convite" aria-label="Código do convite" required>
-        <button class="league-btn" type="submit">Entrar</button>
+          placeholder="${t('leagues.joinPlaceholder')}" aria-label="${t('leagues.joinPlaceholder')}" required>
+        <button class="league-btn" type="submit">${t('leagues.join')}</button>
       </form>
       <p class="league-msg" id="league-msg" aria-live="polite"></p>
     </div>`;
@@ -1524,9 +1524,9 @@ function renderLeaguesView() {
   });
   container.querySelectorAll('.league-copy').forEach(btn => {
     btn.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(btn.dataset.link); btn.textContent = 'Convite copiado!'; }
+      try { await navigator.clipboard.writeText(btn.dataset.link); btn.textContent = t('leagues.copied'); }
       catch { btn.textContent = btn.dataset.link; }
-      setTimeout(() => { btn.textContent = 'Copiar convite'; }, 2000);
+      setTimeout(() => { btn.textContent = t('leagues.copy'); }, 2000);
     });
   });
   container.querySelector('#form-create').addEventListener('submit', e => {
@@ -1563,7 +1563,7 @@ async function joinLeagueFlow(code) {
     return;
   }
   const league = await findLeagueByCode(code);
-  if (!league) { if (msg) msg.textContent = 'Liga não encontrada para esse código.'; return; }
+  if (!league) { if (msg) msg.textContent = t('leagues.notFound'); return; }
   await joinLeague(league.id, currentUser.uid);
   if (!league.memberUids.includes(currentUser.uid)) league.memberUids.push(currentUser.uid);
   userLeagues.push(league);
@@ -1579,14 +1579,14 @@ const groupIdsByMd = md =>
   Object.values(GROUPS).flatMap(g => g.matches).filter(m => m.md === md).map(m => m.id);
 
 const RANKING_ROUNDS = [
-  { label: 'Rodada 1 (grupos)', ids: groupIdsByMd(1) },
-  { label: 'Rodada 2 (grupos)', ids: groupIdsByMd(2) },
-  { label: 'Rodada 3 (grupos)', ids: groupIdsByMd(3) },
-  { label: ROUND_LABELS.r32, ids: KNOCKOUT.r32.map(m => m.id) },
-  { label: ROUND_LABELS.r16, ids: KNOCKOUT.r16.map(m => m.id) },
-  { label: ROUND_LABELS.qf, ids: KNOCKOUT.qf.map(m => m.id) },
-  { label: ROUND_LABELS.sf, ids: KNOCKOUT.sf.map(m => m.id) },
-  { label: 'Final / 3º lugar', ids: [...KNOCKOUT.third, ...KNOCKOUT.final].map(m => m.id) },
+  { label: 'rank.round1', ids: groupIdsByMd(1) },
+  { label: 'rank.round2', ids: groupIdsByMd(2) },
+  { label: 'rank.round3', ids: groupIdsByMd(3) },
+  { label: 'round.r32', ids: KNOCKOUT.r32.map(m => m.id) },
+  { label: 'round.r16', ids: KNOCKOUT.r16.map(m => m.id) },
+  { label: 'round.qf', ids: KNOCKOUT.qf.map(m => m.id) },
+  { label: 'round.sf', ids: KNOCKOUT.sf.map(m => m.id) },
+  { label: 'rank.finalThird', ids: [...KNOCKOUT.third, ...KNOCKOUT.final].map(m => m.id) },
 ];
 
 // Results restricted to every match up to and including round `idx`.
@@ -1610,11 +1610,11 @@ function movementChip(e, hasPrev) {
 // Achievement chips for a ranking entry. `isLeader`/`isRoundTop` are league-relative.
 function badgesFor(e, isLeader, isRoundTop) {
   const badges = [];
-  if (isLeader) badges.push(['👑', 'Líder da liga']);
-  if (isRoundTop) badges.push(['🎯', 'Mais cravadas na rodada']);
-  if (e.streak >= 3) badges.push(['🔥', `Em chamas — ${e.streak} acertos seguidos`]);
-  if (e.perfect > 0) badges.push(['✅', `Grupo perfeito${e.perfect > 1 ? ` ×${e.perfect}` : ''}`]);
-  if (e.nostradamus) badges.push(['🔮', 'Nostradamus — cravou o campeão']);
+  if (isLeader) badges.push(['👑', t('badge.leader')]);
+  if (isRoundTop) badges.push(['🎯', t('badge.roundTop')]);
+  if (e.streak >= 3) badges.push(['🔥', t('badge.streak', { n: e.streak })]);
+  if (e.perfect > 0) badges.push(['✅', e.perfect > 1 ? t('badge.perfectN', { n: e.perfect }) : t('badge.perfect')]);
+  if (e.nostradamus) badges.push(['🔮', t('badge.nostradamus')]);
   if (!badges.length) return '';
   return `<span class="ranking-badges">${badges
     .map(([icon, label]) => `<span class="ach-badge" title="${label}" aria-label="${label}">${icon}</span>`)
@@ -1681,7 +1681,7 @@ async function renderRankingView() {
       <div class="podium-card podium-${e.pos}${isMe ? ' podium-me' : ''}" data-pos="${e.pos}">
         <span class="podium-medal" aria-hidden="true">${medal}</span>
         ${avatarHtml(e.user, 'podium-avatar')}
-        <span class="podium-name">${escapeHtml(e.user.displayName)}${isMe ? ' (eu)' : ''}</span>
+        <span class="podium-name">${escapeHtml(e.user.displayName)}${isMe ? t('rank.me') : ''}</span>
         <span class="podium-total">${e.total}<small>pts</small></span>
         <span class="podium-meta">${movementChip(e, !!prevResults)}${roundBadgeFor(e)}</span>
         ${badgesFor(e, isLeaderOf(e), isRoundTopOf(e))}
@@ -1696,8 +1696,8 @@ async function renderRankingView() {
         ${movementChip(e, !!prevResults)}
         ${avatarHtml(e.user, 'ranking-avatar')}
         <div class="ranking-info">
-          <span class="ranking-name">${escapeHtml(e.user.displayName)}${isMe ? ' (eu)' : ''}</span>
-          <span class="ranking-stats">${e.exact} cravadas · ${e.correct} resultados</span>
+          <span class="ranking-name">${escapeHtml(e.user.displayName)}${isMe ? t('rank.me') : ''}</span>
+          <span class="ranking-stats">${t('rank.stats', { exact: e.exact, correct: e.correct })}</span>
           ${badgesFor(e, isLeaderOf(e), isRoundTopOf(e))}
         </div>
         <span class="ranking-points">${roundBadgeFor(e)}<span class="ranking-total">${e.total}<small>pts</small></span></span>
@@ -1713,13 +1713,13 @@ async function renderRankingView() {
   const rowsHtml = rest.map(rowEntry).join('');
 
   const empty = hasResults ? '' :
-    `<p class="ranking-empty">Os jogos ainda não começaram — o ranking aparece assim que os primeiros resultados saírem.</p>`;
+    `<p class="ranking-empty">${t('rank.empty')}</p>`;
   const roundNote = hasResults
-    ? `<p class="ranking-round-note">Última rodada pontuada: <strong>${RANKING_ROUNDS[lastIdx].label}</strong> — o <span class="rank-move rank-move-up">▲</span>/<span class="rank-move rank-move-down">▼</span> mostra a variação desde a rodada anterior.</p>`
+    ? `<p class="ranking-round-note">${t('rank.note', { round: t(RANKING_ROUNDS[lastIdx].label) })}</p>`
     : '';
 
   container.innerHTML = `
-    <div class="compare-header"><h2>Ranking · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>
+    <div class="compare-header"><h2>${t('nav.ranking')} · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>
     ${empty}
     ${roundNote}
     ${podiumHtml}
