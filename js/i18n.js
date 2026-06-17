@@ -97,6 +97,7 @@ const DICT = {
 
     // --- compare ---
     'compare.champion': 'Campeão previsto',
+    'compare.with': 'Comparar com {name}',
     'compare.you': 'Você',
     'compare.pen': '(pên: {team})',
     'compare.closeAria': 'Fechar comparação',
@@ -104,6 +105,10 @@ const DICT = {
     'compare.theirChampion': 'Campeão de {name}: {flag} <strong>{champion}</strong>',
     'compare.tabGroups': 'Grupos',
     'compare.tabKnockout': 'Mata-Mata',
+    'cmp.same': '✓ igual',
+    'cmp.diff': '✗ diverge',
+    'cmp.result': 'Resultado',
+    'cmp.group': 'Grupo {g}',
 
     // --- leagues ---
     'leagues.code': 'Código <strong>{code}</strong>',
@@ -211,6 +216,7 @@ const DICT = {
     'common.refreshAria': 'Refresh',
 
     'compare.champion': 'Predicted champion',
+    'compare.with': 'Compare with {name}',
     'compare.you': 'You',
     'compare.pen': '(pens: {team})',
     'compare.closeAria': 'Close comparison',
@@ -218,6 +224,10 @@ const DICT = {
     'compare.theirChampion': "{name}'s champion: {flag} <strong>{champion}</strong>",
     'compare.tabGroups': 'Groups',
     'compare.tabKnockout': 'Knockout',
+    'cmp.same': '✓ same',
+    'cmp.diff': '✗ differs',
+    'cmp.result': 'Result',
+    'cmp.group': 'Group {g}',
 
     'leagues.code': 'Code <strong>{code}</strong>',
     'leagues.intro': 'Create a private league and share the invite — the ranking and comparison then count only among its members.',

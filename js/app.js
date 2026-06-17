@@ -41,7 +41,7 @@ function kickoffMs(kickoff) {
   return isNaN(ms) ? null : ms;
 }
 
-const KICKOFF_FMT = new Intl.DateTimeFormat('pt-BR', {
+const KICKOFF_FMT = new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'pt-BR', {
   timeZone: 'America/Sao_Paulo',
   weekday: 'short', day: '2-digit', month: 'short',
   hour: '2-digit', minute: '2-digit',
@@ -917,9 +917,12 @@ function dayLabel(ms) {
   const key = SP_DAY_KEY.format(new Date(ms));
   const today = SP_DAY_KEY.format(new Date());
   const tomorrow = SP_DAY_KEY.format(new Date(Date.now() + 86400000));
-  if (key === today) return 'Hoje';
-  if (key === tomorrow) return 'Amanhã';
-  return SP_DAY_LABEL.format(new Date(ms)).replace(/\./g, '');
+  if (key === today) return t('fx.today');
+  if (key === tomorrow) return t('fx.tomorrow');
+  const fmt = new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'pt-BR', {
+    timeZone: 'America/Sao_Paulo', weekday: 'short', day: '2-digit', month: 'short',
+  });
+  return fmt.format(new Date(ms)).replace(/\./g, '');
 }
 
 // Time remaining until a match locks (kickoff). Null once it has started.
@@ -973,8 +976,8 @@ function renderFixturesView({ scroll = false } = {}) {
     // to the current/next match once the fixtures land, via applyResultsUpdate.
     if (scroll) fixturesScrollPending = true;
     container.innerHTML = `
-      <div class="compare-header"><h2>Jogos</h2></div>
-      <p class="ranking-empty">O calendário aparece aqui assim que os horários dos jogos forem publicados.</p>`;
+      <div class="compare-header"><h2>${t('nav.fixtures')}</h2></div>
+      <p class="ranking-empty">${t('fx.empty')}</p>`;
     return;
   }
 
@@ -990,7 +993,7 @@ function renderFixturesView({ scroll = false } = {}) {
   });
 
   container.innerHTML = `
-    <div class="compare-header"><h2>Jogos</h2></div>
+    <div class="compare-header"><h2>${t('nav.fixtures')}</h2></div>
     ${buckets.map(b => `
       <div class="fx-day">
         <h3 class="fx-day-label">${b.label}</h3>
@@ -1187,7 +1190,7 @@ function syncOwnPredsToRoster() {
 }
 
 const refreshBtnHtml =
-  '<button class="btn-refresh" type="button" aria-label="Atualizar">↻ Atualizar</button>';
+  `<button class="btn-refresh" type="button" aria-label="${t('common.refreshAria')}">${t('common.refresh')}</button>`;
 
 function wireRefresh(container, rerender) {
   const btn = container.querySelector('.btn-refresh');
@@ -1201,7 +1204,7 @@ function wireRefresh(container, rerender) {
 
 async function renderCompareView() {
   const container = document.getElementById('view-compare');
-  container.innerHTML = '<p class="loading-msg">Carregando...</p>';
+  container.innerHTML = `<p class="loading-msg">${t('common.loading')}</p>`;
 
   const { users: roster, preds: predsByUid } = await loadRoster();
   const users = scopeUsers(roster);
@@ -1257,14 +1260,14 @@ function compareCardHtml(entry) {
   const isMe = currentUser && user.uid === currentUser.uid;
   return `
     <button class="compare-card${isMe ? ' compare-card-me' : ''}"
-      data-uid="${user.uid}" aria-label="Comparar com ${escapeHtml(user.displayName)}">
+      data-uid="${user.uid}" aria-label="${t('compare.with', { name: escapeHtml(user.displayName) })}">
       ${avatarHtml(user, 'compare-avatar')}
-      <div class="compare-name">${escapeHtml(user.displayName)}${isMe ? ' (eu)' : ''}</div>
+      <div class="compare-name">${escapeHtml(user.displayName)}${isMe ? t('rank.me') : ''}</div>
       <div class="compare-champion">
         <span class="champion-flag">${flag(champion)}</span>
-        <span class="champion-name">${champion}</span>
+        <span class="champion-name">${tTeam(champion)}</span>
       </div>
-      <div class="compare-label">Campeão previsto</div>
+      <div class="compare-label">${t('compare.champion')}</div>
     </button>`;
 }
 
@@ -1286,7 +1289,7 @@ function cmpPoints(pts) {
 function renderComparison(me, them) {
   const detail = document.getElementById('compare-detail');
   if (!detail) return;
-  const myName = 'Você';
+  const myName = t('compare.you');
   const themName = escapeHtml(them.user.displayName);
 
   // --- Groups: shared fixtures, two stacked score rows ---
@@ -1296,21 +1299,21 @@ function renderComparison(me, them) {
       const bothFilled = mp && tp && mp.home != null && mp.away != null && tp.home != null && tp.away != null;
       const same = bothFilled && Number(mp.home) === Number(tp.home) && Number(mp.away) === Number(tp.away);
       const badge = bothFilled
-        ? (same ? '<span class="cmp-badge cmp-ok">✓ igual</span>' : '<span class="cmp-badge cmp-diff">✗ diverge</span>')
+        ? (same ? `<span class="cmp-badge cmp-ok">${t('cmp.same')}</span>` : `<span class="cmp-badge cmp-diff">${t('cmp.diff')}</span>`)
         : '';
       const r = results[m.id];
       const finished = r && r.status === 'finished' && r.home != null && r.away != null;
       const mePts = finished ? matchPoints(m.id, me.preds, me.koMatches, results) : null;
       const themPts = finished ? matchPoints(m.id, them.preds, them.koMatches, results) : null;
       const officialRow = finished
-        ? `<div class="cmp-row cmp-row-official"><span class="cmp-who">Resultado</span><span class="cmp-score">${r.home} — ${r.away}</span></div>`
+        ? `<div class="cmp-row cmp-row-official"><span class="cmp-who">${t('cmp.result')}</span><span class="cmp-score">${r.home} — ${r.away}</span></div>`
         : '';
       return `
         <div class="cmp-match">
           <div class="cmp-fixture">
-            <span class="cmp-fx-team">${flag(m.home)} ${m.home}</span>
+            <span class="cmp-fx-team">${flag(m.home)} ${tTeam(m.home)}</span>
             <span class="cmp-fx-x">×</span>
-            <span class="cmp-fx-team">${m.away} ${flag(m.away)}</span>
+            <span class="cmp-fx-team">${tTeam(m.away)} ${flag(m.away)}</span>
           </div>
           ${officialRow}
           <div class="cmp-row"><span class="cmp-who">${myName}</span><span class="cmp-score">${fmtScore(mp)}</span>${cmpPoints(mePts)}</div>
@@ -1319,7 +1322,7 @@ function renderComparison(me, them) {
           </div>
         </div>`;
     }).join('');
-    return `<div class="cmp-group"><h4 class="cmp-group-title">Grupo ${g}</h4>${matches}</div>`;
+    return `<div class="cmp-group"><h4 class="cmp-group-title">${t('cmp.group', { g })}</h4>${matches}</div>`;
   }).join('');
 
   // --- Knockout: teams differ per user, so each row is self-contained ---
@@ -1327,16 +1330,16 @@ function renderComparison(me, them) {
     if (!km) return '<span class="cmp-ko-line">–</span>';
     const score = (km.home != null && km.away != null) ? `${km.home} — ${km.away}` : '–';
     const pen = km.penWinner && km.home != null && km.away != null && Number(km.home) === Number(km.away)
-      ? ` <span class="cmp-pen">(pên: ${km.penWinner})</span>` : '';
-    return `<span class="cmp-ko-line">${flag(km.homeTeam)} ${km.homeTeam} <strong>${score}</strong> ${km.awayTeam} ${flag(km.awayTeam)}${pen}</span>`;
+      ? ` <span class="cmp-pen">${t('compare.pen', { team: tTeam(km.penWinner) })}</span>` : '';
+    return `<span class="cmp-ko-line">${flag(km.homeTeam)} ${tTeam(km.homeTeam)} <strong>${score}</strong> ${tTeam(km.awayTeam)} ${flag(km.awayTeam)}${pen}</span>`;
   };
   const koOfficial = (m) => {
     const res = results[m.id];
     if (!res || res.status !== 'finished' || res.home == null || res.away == null) return '';
     const pen = res.penWinner && Number(res.home) === Number(res.away)
-      ? ` <span class="cmp-pen">(pên: ${res.penWinner})</span>` : '';
-    return `<div class="cmp-row cmp-ko-row cmp-row-official"><span class="cmp-who">Resultado</span>` +
-      `<span class="cmp-ko-line">${flag(res.homeTeam)} ${res.homeTeam} <strong>${res.home} — ${res.away}</strong> ${res.awayTeam} ${flag(res.awayTeam)}${pen}</span></div>`;
+      ? ` <span class="cmp-pen">${t('compare.pen', { team: tTeam(res.penWinner) })}</span>` : '';
+    return `<div class="cmp-row cmp-ko-row cmp-row-official"><span class="cmp-who">${t('cmp.result')}</span>` +
+      `<span class="cmp-ko-line">${flag(res.homeTeam)} ${tTeam(res.homeTeam)} <strong>${res.home} — ${res.away}</strong> ${tTeam(res.awayTeam)} ${flag(res.awayTeam)}${pen}</span></div>`;
   };
   const rounds = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
   const koHtml = rounds.map(r => {
@@ -1352,22 +1355,22 @@ function renderComparison(me, them) {
         <div class="cmp-row cmp-ko-row"><span class="cmp-who">${themName}</span>${koLine(them.koMatches[m.id])}${cmpPoints(themPts)}</div>
       </div>`;
     }).join('');
-    return `<div class="cmp-group"><h4 class="cmp-group-title">${ROUND_LABELS[r]}</h4>${matches}</div>`;
+    return `<div class="cmp-group"><h4 class="cmp-group-title">${t('round.' + r)}</h4>${matches}</div>`;
   }).join('');
 
   detail.classList.remove('hidden');
   detail.innerHTML = `
     <div class="cmp-header">
       <h3>${myName} <span class="cmp-vs">vs</span> ${themName}</h3>
-      <button class="cmp-close" type="button" aria-label="Fechar comparação">×</button>
+      <button class="cmp-close" type="button" aria-label="${t('compare.closeAria')}">×</button>
     </div>
     <div class="cmp-champions">
-      <span>Seu campeão: ${flag(me.champion)} <strong>${me.champion}</strong></span>
-      <span>Campeão de ${themName}: ${flag(them.champion)} <strong>${them.champion}</strong></span>
+      <span>${t('compare.yourChampion', { flag: flag(me.champion), champion: tTeam(me.champion) })}</span>
+      <span>${t('compare.theirChampion', { name: themName, flag: flag(them.champion), champion: tTeam(them.champion) })}</span>
     </div>
     <div class="cmp-tabs">
-      <button class="cmp-tab active" data-panel="groups" type="button">Grupos</button>
-      <button class="cmp-tab" data-panel="ko" type="button">Mata-Mata</button>
+      <button class="cmp-tab active" data-panel="groups" type="button">${t('compare.tabGroups')}</button>
+      <button class="cmp-tab" data-panel="ko" type="button">${t('compare.tabKnockout')}</button>
     </div>
     <div class="cmp-panel" id="cmp-panel-groups">${groupsHtml}</div>
     <div class="cmp-panel hidden" id="cmp-panel-ko">${koHtml}</div>
@@ -1620,7 +1623,7 @@ function badgesFor(e, isLeader, isRoundTop) {
 
 async function renderRankingView() {
   const container = document.getElementById('view-ranking');
-  container.innerHTML = '<p class="loading-msg">Carregando...</p>';
+  container.innerHTML = `<p class="loading-msg">${t('common.loading')}</p>`;
 
   const { users: roster, preds } = await loadRoster();
   const users = scopeUsers(roster);
