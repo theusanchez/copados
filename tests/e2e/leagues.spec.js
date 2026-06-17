@@ -49,13 +49,15 @@ test('ranking is scoped to active league members and Geral shows everyone', asyn
 
   await page.locator('.nav-tab[data-view="ranking"]').click();
   await expect(page.locator('#view-ranking .compare-header h2')).toContainText('Trio');
-  await expect(page.locator('.ranking-name')).toHaveCount(2);
+  // Entries render on the podium (top 3) and/or as list rows.
+  const names = page.locator('#view-ranking .podium-name, #view-ranking .ranking-name');
+  await expect(names).toHaveCount(2);
   await expect(page.locator('#view-ranking')).toContainText('Alice');
   await expect(page.locator('#view-ranking')).not.toContainText('Bob');
 
   // Switch to Geral via the switcher → all three show up.
   await page.locator('#view-ranking .league-select').selectOption('geral');
-  await expect(page.locator('.ranking-name')).toHaveCount(3);
+  await expect(names).toHaveCount(3);
   await expect(page.locator('#view-ranking')).toContainText('Bob');
 });
 

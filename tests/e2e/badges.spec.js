@@ -3,8 +3,9 @@ import { boot, user, fullPreds } from './helpers.js';
 import { predictedChampion } from '../../js/engine.js';
 import { GROUPS } from '../../js/data.js';
 
+// "me" may render on the podium (top 3) or as a list row (4th+).
 function meRow(page) {
-  return page.locator('#view-ranking .ranking-row').first();
+  return page.locator('#view-ranking .podium-me, #view-ranking .ranking-row-me');
 }
 
 test('leader, round-top and hot-streak badges', async ({ page }) => {
@@ -29,8 +30,8 @@ test('leader, round-top and hot-streak badges', async ({ page }) => {
   await expect(meRow(page).locator('.ach-badge[title*="cravadas na rodada"]')).toBeVisible();
   await expect(meRow(page).locator('.ach-badge[title*="Em chamas"]')).toBeVisible();
 
-  // Alice (last place, all wrong) earns no badges.
-  await expect(page.locator('#view-ranking .ranking-row').nth(1).locator('.ach-badge')).toHaveCount(0);
+  // Alice (last place, all wrong) earns no badges — she's 2nd on the podium.
+  await expect(page.locator('#view-ranking .podium-card[data-pos="2"] .ach-badge')).toHaveCount(0);
 });
 
 test('perfect-group and Nostradamus badges', async ({ page }) => {
