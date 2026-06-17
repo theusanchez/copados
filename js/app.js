@@ -2,6 +2,7 @@ import { loginWithGoogle, logout, onAuthChange, loginAsGuest, registerWithEmail,
 import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
 import { venueLabel } from './venues.js';
 import { FEATURES } from './features.js';
+import { t, tTeam, lang, setLang, applyStaticI18n } from './i18n.js';
 import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, bestStreak, perfectGroups, isNostradamus } from './engine.js';
 
 // -----------------------------------------------------------------------
@@ -373,6 +374,23 @@ document.querySelectorAll('.theme-swatch').forEach(btn =>
 
 // Sync status-bar color + pressed state with whatever the boot script applied.
 applyTheme(document.documentElement.dataset.theme || 'classico');
+
+// -----------------------------------------------------------------------
+// Language
+// -----------------------------------------------------------------------
+// Translate the static markup on boot, then wire the PT/EN switcher. Changing the
+// language reloads the page so every rendered view picks up the new strings — it's a
+// rare action and far simpler/safer than re-running every render function.
+document.documentElement.lang = lang === 'en' ? 'en' : 'pt-BR';
+applyStaticI18n();
+document.querySelectorAll('.lang-btn').forEach(btn => {
+  btn.setAttribute('aria-pressed', String(btn.dataset.lang === lang));
+  btn.addEventListener('click', () => {
+    if (btn.dataset.lang === lang) return;
+    setLang(btn.dataset.lang);
+    location.reload();
+  });
+});
 
 // -----------------------------------------------------------------------
 // View switching

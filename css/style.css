@@ -2329,3 +2329,35 @@ main {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+/* ----- Language picker (PT/EN) ----- */
+.lang-picker {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--card);
+}
+#view-login .lang-picker {
+  margin: 1.25rem auto 0;
+}
+.lang-btn {
+  background: none;
+  border: none;
+  color: var(--subtext);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.25rem 0.6rem;
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+.lang-btn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--primary);
+}
+.lang-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
