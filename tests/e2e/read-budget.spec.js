@@ -23,15 +23,14 @@ test('navigating between tabs does not re-read predictions', async ({ page }) =>
   const first = await reads(page);
   expect(first).toBe(USERS.length); // one read per user, once
 
-  // Leave and come back, then hit compare (shares the cache): no new reads.
+  // Leave and come back to the ranking (shares the cache): no new reads.
   await page.locator('.nav-tab[data-view="groups"]').click();
   await page.locator('.nav-tab[data-view="ranking"]').click();
-  await page.locator('.nav-tab[data-view="compare"]').click();
-  await expect(page.locator('#view-compare')).toBeVisible();
+  await expect(page.locator('#view-ranking')).toBeVisible();
   expect(await reads(page)).toBe(first);
 
   // The explicit refresh button is the only thing that re-reads.
-  await page.locator('#view-compare .btn-refresh').click();
+  await page.locator('#view-ranking .btn-refresh').click();
   await expect.poll(() => reads(page)).toBe(first * 2);
 });
 

@@ -234,10 +234,6 @@
             <span class="nav-icon" aria-hidden="true">⚔️</span>
             <span class="nav-label" data-i18n="nav.knockout">Mata-Mata</span>
           </button>
-          <button class="nav-tab" data-view="compare" type="button">
-            <span class="nav-icon" aria-hidden="true">⚖️</span>
-            <span class="nav-label" data-i18n="nav.compare">Comparar</span>
-          </button>
           <button class="nav-tab" data-view="ranking" type="button">
             <span class="nav-icon" aria-hidden="true">🏆</span>
             <span class="nav-label" data-i18n="nav.ranking">Ranking</span>
@@ -245,6 +241,14 @@
           <button class="nav-tab" data-view="leagues" type="button">
             <span class="nav-icon" aria-hidden="true">🛡️</span>
             <span class="nav-label" data-i18n="nav.leagues">Ligas</span>
+          </button>
+          <button
+            class="nav-tab nav-tab-admin hidden"
+            data-view="admin"
+            type="button"
+          >
+            <span class="nav-icon" aria-hidden="true">🛠️</span>
+            <span class="nav-label" data-i18n="nav.admin">Admin</span>
           </button>
         </nav>
 
@@ -343,15 +347,6 @@
           <!-- Rendered by app.js -->
         </section>
 
-        <!-- Compare view -->
-        <section
-          id="view-compare"
-          class="hidden"
-          aria-label="Comparar palpites"
-        >
-          <!-- Rendered by app.js -->
-        </section>
-
         <!-- Ranking view -->
         <section id="view-ranking" class="hidden" aria-label="Ranking">
           <!-- Rendered by app.js -->
@@ -361,7 +356,24 @@
         <section id="view-leagues" class="hidden" aria-label="Ligas">
           <!-- Rendered by app.js -->
         </section>
+
+        <!-- Admin dashboard (rendered by app.js, gated to admin uids) -->
+        <section id="view-admin" class="hidden" aria-label="Painel de admin">
+          <!-- Rendered by app.js -->
+        </section>
       </main>
+
+      <!-- Comparison modal (opened from a ranking card; rendered by app.js) -->
+      <div
+        id="cmp-modal"
+        class="cmp-modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Comparação de palpites"
+      >
+        <div class="cmp-modal-backdrop"></div>
+        <div class="cmp-modal-body"><!-- Rendered by app.js --></div>
+      </div>
     </div>
 
     <script type="module" src="js/app.js"></script>

@@ -3,19 +3,22 @@ import { boot, user, fullPreds } from './helpers.js';
 
 const XSS = '<img src=x onerror="window.__xssFired=true">';
 
-test('a malicious display name is escaped, not executed, in compare', async ({ page }) => {
+test('a malicious display name is escaped, not executed, in the comparison modal', async ({ page }) => {
   await boot(page, {
     currentUser: user('me', 'Eu'),
     users: [user('me', 'Eu'), user('evil', XSS)],
     predictions: { me: fullPreds(), evil: fullPreds() },
   });
 
-  await page.locator('.nav-tab[data-view="compare"]').click();
+  await page.locator('.nav-tab[data-view="ranking"]').click();
+  await page.locator('.rank-clickable[data-uid="evil"]').click();
 
-  // The injected name renders as text — no <img> element is created from it,
-  // and its onerror never fires.
-  await expect(page.locator('.compare-name img')).toHaveCount(0);
-  await expect(page.locator('.compare-name', { hasText: 'onerror' })).toBeVisible();
+  // The injected name renders as text — no <img> element is created from it
+  // (flags are imgs, so scope the assertion to the name heading), and onerror never fires.
+  const modal = page.locator('#cmp-modal');
+  await expect(modal).toBeVisible();
+  await expect(modal.locator('.cmp-header h3 img')).toHaveCount(0);
+  await expect(modal.locator('.cmp-header h3')).toContainText('onerror');
   expect(await page.evaluate(() => window.__xssFired)).toBeFalsy();
 });
 

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { boot, user } from './helpers.js';
 
-test('a guest can play but is gated out of ranking and compare', async ({ page }) => {
+test('a guest can play but is gated out of ranking', async ({ page }) => {
   await boot(page, { currentUser: null, users: [] });
 
   await page.locator('#btn-guest').click();
@@ -19,14 +19,9 @@ test('a guest can play but is gated out of ranking and compare', async ({ page }
   await expect(page.locator('#view-ranking .guest-gate')).toBeVisible();
   await expect(page.locator('#view-ranking .ranking-row')).toHaveCount(0);
   await expect(page.locator('.nav-tab[data-view="ranking"]')).toHaveClass(/locked/);
-
-  // Compare too.
-  await page.locator('.nav-tab[data-view="compare"]').click();
-  await expect(page.locator('#view-compare .guest-gate')).toBeVisible();
-  await expect(page.locator('#view-compare .compare-card')).toHaveCount(0);
 });
 
-test('guests never show up in another user\'s compare list', async ({ page }) => {
+test('guests never show up in another user\'s ranking', async ({ page }) => {
   await boot(page, {
     currentUser: user('me', 'Eu'),
     users: [
@@ -35,7 +30,7 @@ test('guests never show up in another user\'s compare list', async ({ page }) =>
     ],
   });
 
-  await page.locator('.nav-tab[data-view="compare"]').click();
-  await expect(page.locator('#view-compare')).toContainText('Eu');
-  await expect(page.locator('#view-compare')).not.toContainText('Convidado');
+  await page.locator('.nav-tab[data-view="ranking"]').click();
+  await expect(page.locator('#view-ranking')).toContainText('Eu');
+  await expect(page.locator('#view-ranking')).not.toContainText('Convidado');
 });

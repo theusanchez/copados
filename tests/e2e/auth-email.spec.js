@@ -17,9 +17,9 @@ test('registering with email enters the app and joins the user list', async ({ p
   await expect(page.locator('#view-app')).toBeVisible();
   await expect(page.locator('#user-info')).toContainText('Ana Souza');
 
-  // A real account shows up for everyone in the compare list.
-  await page.locator('.nav-tab[data-view="compare"]').click();
-  await expect(page.locator('#view-compare')).toContainText('Ana Souza');
+  // A real account shows up for everyone in the ranking.
+  await page.locator('.nav-tab[data-view="ranking"]').click();
+  await expect(page.locator('#view-ranking')).toContainText('Ana Souza');
 });
 
 test('an existing email signs in instead of duplicating the account', async ({ page }) => {
@@ -71,8 +71,8 @@ test('a user saved without a name shows a fallback, never the string "null"', as
     resetVersions: { me: 1 },
   });
 
-  await page.locator('.nav-tab[data-view="compare"]').click();
-  const card = page.locator('#view-compare .compare-card[data-uid="x"]');
+  await page.locator('.nav-tab[data-view="ranking"]').click();
+  const card = page.locator('#view-ranking .rank-clickable[data-uid="x"]');
   await expect(card).toContainText('Sem nome');
   await expect(card).not.toContainText('null');
 });

@@ -24,6 +24,22 @@ const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
 // v1: 2026-06-14 — fixed the R16+ bracket to match the official 2026 flow.
 const KNOCKOUT_RESET_VERSION = 1;
 
+// Admin gate (cosmetic, client-side): only these uids see the Admin dashboard tab.
+// Everything the dashboard shows is already readable by any signed-in user
+// (see firestore.rules), so this only hides the tab — it is NOT a security boundary.
+// An `admin_uids` localStorage value overrides the list (used by E2E / manual debug).
+const ADMIN_UIDS = (() => {
+  try {
+    const override = localStorage.getItem('admin_uids');
+    if (override) return override.split(',').map(s => s.trim()).filter(Boolean);
+  } catch { /* no localStorage */ }
+  return ['bYoZHDauDMYgHSomEPh12v0Ern53'];
+})();
+
+function isAdmin() {
+  return !!currentUser && ADMIN_UIDS.includes(currentUser.uid);
+}
+
 // -----------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------
@@ -180,7 +196,7 @@ function isGuest() {
 
 // Social views require a real account: guests can play but not appear in / see
 // the ranking and league features until they sign up.
-const GUEST_LOCKED_VIEWS = ['compare', 'ranking', 'leagues'];
+const GUEST_LOCKED_VIEWS = ['ranking', 'leagues'];
 
 // Finish a magic-link login if the app was opened from the email link, before we
 // wire the auth listener (avoids a flash of the login screen).
@@ -402,16 +418,19 @@ function showApp() {
   switchMainView(start);
 }
 
-// Dim the social tabs a guest can't open yet.
+// Dim the social tabs a guest can't open yet, and reveal the Admin tab to admins.
 function applyGuestUi() {
   const guest = isGuest();
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.toggle('locked', guest && GUEST_LOCKED_VIEWS.includes(tab.dataset.view));
   });
+  document.querySelector('.nav-tab-admin')?.classList.toggle('hidden', !isAdmin());
 }
 
 function switchMainView(view) {
-  ['fixtures', 'groups', 'knockout', 'compare', 'ranking', 'leagues'].forEach(v => {
+  // Non-admins can never land on the admin view (the tab is hidden, but guard anyway).
+  if (view === 'admin' && !isAdmin()) view = 'groups';
+  ['fixtures', 'groups', 'knockout', 'ranking', 'leagues', 'admin'].forEach(v => {
     document.getElementById(`view-${v}`).classList.toggle('hidden', v !== view);
   });
   document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -422,9 +441,9 @@ function switchMainView(view) {
     return;
   }
   if (view === 'fixtures') renderFixturesView({ scroll: true });
-  if (view === 'compare') renderCompareView();
   if (view === 'ranking') renderRankingView();
   if (view === 'leagues') renderLeaguesView();
+  if (view === 'admin') renderAdminView();
 }
 
 // Shown to a guest in place of a locked social view: a sign-up prompt that
@@ -1080,7 +1099,7 @@ function renderActiveResultsView() {
   const active = document.querySelector('.nav-tab.active')?.dataset.view;
   if (active === 'fixtures') renderFixturesView({ scroll: fixturesScrollPending });
   else if (active === 'ranking') renderRankingView();
-  else if (active === 'compare') renderCompareView();
+  else if (active === 'admin') renderAdminView();
 }
 
 // Initial results read (loadResults on boot) landed: render everything that
@@ -1154,11 +1173,9 @@ setInterval(() => {
 }, 60000);
 
 // -----------------------------------------------------------------------
-// Compare view
+// Shared roster cache (ranking + comparison modal)
 // -----------------------------------------------------------------------
-let compareEntries = [];   // [{ user, preds, koMatches, champion, complete }]
-
-// In-memory roster cache: { users, preds: { uid: preds } }. Ranking + compare share it
+// In-memory roster cache: { users, preds: { uid: preds } }. Ranking + comparison share it
 // so switching tabs or a live score update re-renders WITHOUT re-reading every user's
 // predictions from Firestore — that re-read on every navigation/update is what burned
 // the daily read quota. Refilled only on first use, on an explicit "Atualizar", or with
@@ -1202,77 +1219,31 @@ function wireRefresh(container, rerender) {
   });
 }
 
-async function renderCompareView() {
-  const container = document.getElementById('view-compare');
-  container.innerHTML = `<p class="loading-msg">${t('common.loading')}</p>`;
-
-  const { users: roster, preds: predsByUid } = await loadRoster();
-  const users = scopeUsers(roster);
-  compareEntries = users.map(u => {
+// Open the comparison modal for "me vs them", building both entries from the
+// already-loaded roster + preds map. Reused by the ranking cards. Comparing
+// yourself (or an unknown uid) is a no-op.
+function openComparison(uid, roster, predsByUid) {
+  if (!uid || uid === currentUser?.uid) return;
+  const entryFor = (u) => {
     const preds = predsByUid[u.uid] || {};
     const koMatches = resolveKnockout(preds);
-    // No champion until the group stage is complete — the bracket is otherwise
-    // resolved from partial standings and would show a bogus winner.
-    const champion = groupStageReady(preds) ? championOf(koMatches) : '?';
+    // No champion until the group stage is complete — the bracket would otherwise
+    // resolve from partial standings and show a bogus winner.
     return {
       user: u,
       preds,
       koMatches,
-      champion,
+      champion: groupStageReady(preds) ? championOf(koMatches) : '?',
       complete: predsComplete(preds),
     };
-  });
-
-  const byName = (a, b) => (a.user.displayName || '').localeCompare(b.user.displayName || '');
-  const complete = compareEntries.filter(e => e.complete).sort(byName);
-  const incomplete = compareEntries.filter(e => !e.complete).sort(byName);
-
-  const section = (title, entries) => entries.length ? `
-    <section class="compare-section">
-      <h3 class="compare-section-title">${title} <span class="compare-count">(${entries.length})</span></h3>
-      <div class="compare-grid">${entries.map(compareCardHtml).join('')}</div>
-    </section>` : '';
-
-  container.innerHTML = `
-    <div class="compare-header"><h2>${t('compare.heading')} · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>
-    ${section(t('compare.complete'), complete)}
-    ${section(t('compare.incomplete'), incomplete)}
-    <div id="compare-detail" class="compare-detail hidden"></div>
-  `;
-
-  attachAvatarFallback(container);
-  wireLeagueSwitcher(container, renderCompareView);
-  wireRefresh(container, renderCompareView);
-
-  container.querySelectorAll('.compare-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const uid = card.dataset.uid;
-      if (uid === currentUser?.uid) return; // comparing yourself is a no-op
-      const them = compareEntries.find(e => e.user.uid === uid);
-      const me = compareEntries.find(e => e.user.uid === currentUser?.uid);
-      if (them && me) renderComparison(me, them);
-    });
-  });
-}
-
-function compareCardHtml(entry) {
-  const { user, champion } = entry;
-  const isMe = currentUser && user.uid === currentUser.uid;
-  return `
-    <button class="compare-card${isMe ? ' compare-card-me' : ''}"
-      data-uid="${user.uid}" aria-label="${t('compare.with', { name: escapeHtml(user.displayName) })}">
-      ${avatarHtml(user, 'compare-avatar')}
-      <div class="compare-name">${escapeHtml(user.displayName)}${isMe ? t('rank.me') : ''}</div>
-      <div class="compare-champion">
-        <span class="champion-flag">${flag(champion)}</span>
-        <span class="champion-name">${tTeam(champion)}</span>
-      </div>
-      <div class="compare-label">${t('compare.champion')}</div>
-    </button>`;
+  };
+  const them = roster.find(u => u.uid === uid);
+  const me = roster.find(u => u.uid === currentUser?.uid);
+  if (them && me) renderComparison(entryFor(me), entryFor(them));
 }
 
 // -----------------------------------------------------------------------
-// Comparison detail: "you vs them", stacked rows per match
+// Comparison modal: "you vs them", stacked rows per match
 // -----------------------------------------------------------------------
 function fmtScore(p) {
   if (!p || p.home == null || p.away == null) return '–';
@@ -1286,9 +1257,22 @@ function cmpPoints(pts) {
   return `<span class="cmp-pts ${cls}">+${pts}</span>`;
 }
 
+function closeCmpModal() {
+  const modal = document.getElementById('cmp-modal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.querySelector('.cmp-modal-body').innerHTML = '';
+  document.removeEventListener('keydown', cmpEscHandler);
+}
+
+function cmpEscHandler(e) {
+  if (e.key === 'Escape') closeCmpModal();
+}
+
 function renderComparison(me, them) {
-  const detail = document.getElementById('compare-detail');
-  if (!detail) return;
+  const modal = document.getElementById('cmp-modal');
+  if (!modal) return;
+  const detail = modal.querySelector('.cmp-modal-body');
   const myName = t('compare.you');
   const themName = escapeHtml(them.user.displayName);
 
@@ -1358,7 +1342,7 @@ function renderComparison(me, them) {
     return `<div class="cmp-group"><h4 class="cmp-group-title">${t('round.' + r)}</h4>${matches}</div>`;
   }).join('');
 
-  detail.classList.remove('hidden');
+  modal.classList.remove('hidden');
   detail.innerHTML = `
     <div class="cmp-header">
       <h3>${myName} <span class="cmp-vs">vs</span> ${themName}</h3>
@@ -1376,10 +1360,9 @@ function renderComparison(me, them) {
     <div class="cmp-panel hidden" id="cmp-panel-ko">${koHtml}</div>
   `;
 
-  detail.querySelector('.cmp-close').addEventListener('click', () => {
-    detail.classList.add('hidden');
-    detail.innerHTML = '';
-  });
+  detail.querySelector('.cmp-close').addEventListener('click', closeCmpModal);
+  modal.querySelector('.cmp-modal-backdrop').addEventListener('click', closeCmpModal);
+  document.addEventListener('keydown', cmpEscHandler);
   detail.querySelectorAll('.cmp-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       detail.querySelectorAll('.cmp-tab').forEach(t => t.classList.remove('active'));
@@ -1389,7 +1372,7 @@ function renderComparison(me, them) {
     });
   });
 
-  detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  detail.scrollTop = 0;
 }
 
 // -----------------------------------------------------------------------
@@ -1672,13 +1655,17 @@ async function renderRankingView() {
   const isLeaderOf = (e) => hasResults && e.pos === 1 && e.total > 0;
   const isRoundTopOf = (e) => hasResults && maxRoundExact > 0 && e.roundExact === maxRoundExact;
 
+  // Every card but your own opens the comparison modal (you vs them).
+  const clickAttrs = (e, isMe) => isMe ? '' :
+    ` data-uid="${e.user.uid}" role="button" tabindex="0" aria-label="${t('compare.with', { name: escapeHtml(e.user.displayName) })}"`;
+
   // Top 3 are shown on a podium (champion raised in the middle); everyone else
   // is a list row below. Before any result, it's a plain list (no podium).
   const podiumCard = (e) => {
     const isMe = currentUser && e.user.uid === currentUser.uid;
     const medal = ['🥇', '🥈', '🥉'][e.pos - 1] || '';
     return `
-      <div class="podium-card podium-${e.pos}${isMe ? ' podium-me' : ''}" data-pos="${e.pos}">
+      <div class="podium-card podium-${e.pos}${isMe ? ' podium-me' : ' rank-clickable'}" data-pos="${e.pos}"${clickAttrs(e, isMe)}>
         <span class="podium-medal" aria-hidden="true">${medal}</span>
         ${avatarHtml(e.user, 'podium-avatar')}
         <span class="podium-name">${escapeHtml(e.user.displayName)}${isMe ? t('rank.me') : ''}</span>
@@ -1691,7 +1678,7 @@ async function renderRankingView() {
   const rowEntry = (e) => {
     const isMe = currentUser && e.user.uid === currentUser.uid;
     return `
-      <div class="ranking-row${isMe ? ' ranking-row-me' : ''}">
+      <div class="ranking-row${isMe ? ' ranking-row-me' : ' rank-clickable'}"${clickAttrs(e, isMe)}>
         <span class="ranking-pos">${e.pos}</span>
         ${movementChip(e, !!prevResults)}
         ${avatarHtml(e.user, 'ranking-avatar')}
@@ -1729,4 +1716,139 @@ async function renderRankingView() {
   attachAvatarFallback(container);
   wireLeagueSwitcher(container, renderRankingView);
   wireRefresh(container, renderRankingView);
+
+  container.querySelectorAll('.rank-clickable[data-uid]').forEach(card => {
+    const open = () => openComparison(card.dataset.uid, users, preds);
+    card.addEventListener('click', open);
+    card.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); }
+    });
+  });
+}
+
+// -----------------------------------------------------------------------
+// Admin dashboard (gated to ADMIN_UIDS). Shows only data already readable by
+// any signed-in user (see firestore.rules) — aggregates, not a security boundary.
+// -----------------------------------------------------------------------
+function timeAgo(ms) {
+  if (ms == null) return '—';
+  const min = Math.round((Date.now() - ms) / 60000);
+  if (min < 1) return t('admin.now');
+  if (min < 60) return t('admin.minAgo', { n: min });
+  const h = Math.round(min / 60);
+  if (h < 24) return t('admin.hAgo', { n: h });
+  return t('admin.dAgo', { n: Math.round(h / 24) });
+}
+
+async function renderAdminView() {
+  const container = document.getElementById('view-admin');
+  if (!isAdmin()) { container.innerHTML = ''; return; }
+  container.innerHTML = `<p class="loading-msg">${t('common.loading')}</p>`;
+
+  const { users: roster, preds } = await loadRoster();
+  const users = scopeUsers(roster);
+
+  // --- 1) System health (from the results collection) ---
+  const resList = Object.values(results);
+  const byStatus = { scheduled: 0, live: 0, paused: 0, finished: 0 };
+  let lastUpdate = null;
+  const liveNow = [];
+  resList.forEach(r => {
+    if (byStatus[r.status] != null) byStatus[r.status]++;
+    const up = kickoffMs(r.updatedAt);
+    if (up != null && (lastUpdate == null || up > lastUpdate)) lastUpdate = up;
+    if (r.status === 'live' || r.status === 'paused') liveNow.push(r);
+  });
+  const liveCount = byStatus.live + byStatus.paused;
+  const stale = liveCount > 0 && lastUpdate != null && (Date.now() - lastUpdate) > 10 * 60 * 1000;
+
+  const healthHtml = `
+    <div class="admin-card">
+      <h3 class="admin-card-title">${t('admin.health')}</h3>
+      <div class="admin-stats">
+        <div class="admin-stat"><span class="admin-stat-num">${byStatus.scheduled}</span><span class="admin-stat-lbl">${t('admin.scheduled')}</span></div>
+        <div class="admin-stat"><span class="admin-stat-num">${liveCount}</span><span class="admin-stat-lbl">${t('admin.live')}</span></div>
+        <div class="admin-stat"><span class="admin-stat-num">${byStatus.finished}</span><span class="admin-stat-lbl">${t('admin.finished')}</span></div>
+        <div class="admin-stat"><span class="admin-stat-num">${resList.length}</span><span class="admin-stat-lbl">${t('admin.docs')}</span></div>
+      </div>
+      <p class="admin-line${stale ? ' admin-alert' : ''}">${t('admin.lastUpdate')}: <strong>${timeAgo(lastUpdate)}</strong>${stale ? ` ⚠️ ${t('admin.staleWarn')}` : ''}</p>
+      ${liveNow.length
+        ? `<ul class="admin-live">${liveNow.map(r =>
+            `<li>${flag(r.homeTeam)} ${tTeam(r.homeTeam)} <strong>${r.home ?? '–'}–${r.away ?? '–'}</strong> ${tTeam(r.awayTeam)} ${flag(r.awayTeam)} <span class="admin-badge">${r.status === 'paused' ? t('live.half') : t('live.now')}</span></li>`).join('')}</ul>`
+        : `<p class="admin-muted">${t('admin.noLive')}</p>`}
+    </div>`;
+
+  // --- 2) Engagement (per scoped user) ---
+  const eng = users.map(u => {
+    const cf = countFilled(preds[u.uid] || {});
+    const filled = cf.group + cf.ko, total = cf.groupTotal + cf.koTotal;
+    return {
+      user: u, filled, total,
+      pct: Math.round((filled / total) * 100),
+      koDone: predsComplete(preds[u.uid] || {}),
+      updated: kickoffMs((preds[u.uid] || {}).updatedAt),
+    };
+  }).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+
+  const engHtml = `
+    <div class="admin-card">
+      <h3 class="admin-card-title">${t('admin.engagement')} <span class="admin-count">(${users.length})</span></h3>
+      <table class="admin-table">
+        <thead><tr><th>${t('admin.user')}</th><th>${t('admin.progress')}</th><th>${t('admin.ko')}</th><th>${t('admin.lastEdit')}</th></tr></thead>
+        <tbody>${eng.map(e => `
+          <tr>
+            <td>${escapeHtml(e.user.displayName)}${e.user.uid === currentUser?.uid ? t('rank.me') : ''}</td>
+            <td><div class="admin-bar"><span style="width:${e.pct}%"></span></div><span class="admin-bar-lbl">${e.filled}/${e.total}</span></td>
+            <td>${e.koDone ? '✅' : '⏳'}</td>
+            <td class="admin-muted">${timeAgo(e.updated)}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+
+  // --- 3) Read estimate (client-side proxy; NOT the official Firestore counter) ---
+  const perBoot = resList.length + roster.length + users.length;
+  const readsHtml = `
+    <div class="admin-card">
+      <h3 class="admin-card-title">${t('admin.reads')}</h3>
+      <p class="admin-line"><code>${t('admin.readsFormula')}</code></p>
+      <p class="admin-line">${t('admin.readsBoot')}: <strong>${perBoot}</strong>
+        <span class="admin-muted">(${resList.length} ${t('admin.results')} + ${roster.length} ${t('admin.users')} + ${users.length} ${t('admin.preds')})</span></p>
+      <p class="admin-muted">${t('admin.readsNote')}</p>
+    </div>`;
+
+  // --- 4) Pool overview: ranking + predicted champions ---
+  const scored = users.map(u => {
+    const p = preds[u.uid] || {};
+    return {
+      user: u,
+      total: scoreUser(p, results).total,
+      champion: groupStageReady(p) ? championOf(resolveKnockout(p)) : '?',
+    };
+  }).sort((a, b) => b.total - a.total);
+  const champCount = {};
+  scored.forEach(s => { if (s.champion && s.champion !== '?') champCount[s.champion] = (champCount[s.champion] || 0) + 1; });
+  const champDist = Object.entries(champCount).sort((a, b) => b[1] - a[1]);
+
+  const overviewHtml = `
+    <div class="admin-card">
+      <h3 class="admin-card-title">${t('admin.overview')}</h3>
+      <ol class="admin-rank">${scored.map(s =>
+        `<li><span class="admin-rank-name">${escapeHtml(s.user.displayName)}</span><span class="admin-muted">${flag(s.champion)} ${tTeam(s.champion)}</span><strong>${s.total}<small>pts</small></strong></li>`).join('')}</ol>
+      ${champDist.length
+        ? `<div class="admin-champs"><h4>${t('admin.champDist')}</h4>${champDist.map(([team, n]) =>
+            `<span class="admin-chip">${flag(team)} ${tTeam(team)} <strong>${n}</strong></span>`).join('')}</div>`
+        : ''}
+    </div>`;
+
+  container.innerHTML = `
+    <div class="compare-header"><h2>${t('nav.admin')} · ${activeLeagueName()}</h2>${refreshBtnHtml}</div>
+    <div class="admin-grid">
+      ${healthHtml}
+      ${readsHtml}
+      ${engHtml}
+      ${overviewHtml}
+    </div>`;
+
+  attachAvatarFallback(container);
+  wireRefresh(container, renderAdminView);
 }

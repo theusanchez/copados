@@ -30,7 +30,7 @@ test('a guest upgrades to a real account keeping their predictions', async ({ pa
   await page.locator('.nav-tab[data-view="groups"]').click();
   await expect(page.locator('.score-input[data-match-id="A1"][data-side="home"]')).toHaveValue('3');
 
-  // And the upgraded user now appears in compare.
-  await page.locator('.nav-tab[data-view="compare"]').click();
-  await expect(page.locator('#view-compare')).toContainText('Diego');
+  // And the upgraded user now appears in the ranking.
+  await page.locator('.nav-tab[data-view="ranking"]').click();
+  await expect(page.locator('#view-ranking')).toContainText('Diego');
 });
