@@ -89,6 +89,7 @@ const DICT = {
     'live.half': 'INTERVALO',
     'aria.score': 'Placar {team}',
     'pens.label': 'Pens:',
+    'result.label': 'Resultado:',
 
     // --- common ---
     'common.loading': 'Carregando...',
@@ -226,6 +227,7 @@ const DICT = {
     'live.half': 'HALF-TIME',
     'aria.score': '{team} score',
     'pens.label': 'Pens:',
+    'result.label': 'Result:',
 
     'common.loading': 'Loading...',
     'common.refresh': '↻ Refresh',

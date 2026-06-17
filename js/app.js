@@ -712,9 +712,9 @@ function renderMatchResult(r, isKnockout, pts) {
   const ptsClass = pts === 5 ? 'pts-exact' : pts === 3 ? 'pts-partial' : 'pts-zero';
   const badge = `<span class="result-pts ${ptsClass}">+${pts}</span>`;
   const score = isKnockout
-    ? `${flag(r.homeTeam)} ${r.homeTeam} ${r.home} × ${r.away} ${r.awayTeam} ${flag(r.awayTeam)}`
+    ? `${flag(r.homeTeam)} ${tTeam(r.homeTeam)} ${r.home} × ${r.away} ${tTeam(r.awayTeam)} ${flag(r.awayTeam)}`
     : `${r.home} × ${r.away}`;
-  return `<div class="match-result"><span class="result-label">Resultado:</span> ${score} ${badge}</div>`;
+  return `<div class="match-result"><span class="result-label">${t('result.label')}</span> ${score} ${badge}</div>`;
 }
 
 function renderGroupStandings(groupKey) {
