@@ -8,6 +8,8 @@
 // R32/R16/QF/SF venues are left out until each bracket slot can be mapped precisely,
 // so we never show a wrong stadium.
 
+import { lang } from './i18n.js';
+
 export const VENUES = {
   azteca:    { stadium: 'Estadio Azteca',          city: 'Cidade do México', state: 'CDMX',               country: 'México' },
   akron:     { stadium: 'Estadio Akron',           city: 'Zapopan',          state: 'Jalisco',            country: 'México' },
@@ -61,8 +63,19 @@ export function venueFor(matchId) {
   return VENUES[MATCH_VENUE[matchId]] || null;
 }
 
-// "Stadium · City, State (Country)" or null when unknown.
+// Geographic terms that differ in English (stadium names are proper nouns — kept).
+const GEO_EN = {
+  'Cidade do México': 'Mexico City', 'Filadélfia': 'Philadelphia',
+  'Nova Jersey': 'New Jersey', 'Califórnia': 'California', 'Geórgia': 'Georgia',
+  'Pensilvânia': 'Pennsylvania', 'Flórida': 'Florida', 'Ontário': 'Ontario',
+  'Colúmbia Britânica': 'British Columbia',
+  'México': 'Mexico', 'EUA': 'USA', 'Canadá': 'Canada',
+};
+const geo = (s) => (lang === 'en' ? GEO_EN[s] || s : s);
+
+// "Stadium · City, State (Country)" or null when unknown. City/state/country follow
+// the active language; the stadium name stays as-is.
 export function venueLabel(matchId) {
   const v = venueFor(matchId);
-  return v ? `${v.stadium} · ${v.city}, ${v.state} (${v.country})` : null;
+  return v ? `${v.stadium} · ${geo(v.city)}, ${geo(v.state)} (${geo(v.country)})` : null;
 }

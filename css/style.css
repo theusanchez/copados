@@ -1295,6 +1295,21 @@ main {
   margin-bottom: 0.5rem;
 }
 
+/* Desktop: break the bracket out of the 900px main column so more rounds/matches
+   are visible at once instead of floating in the middle with empty sides. */
+@media (min-width: 901px) {
+  #view-knockout {
+    width: 94vw;
+    max-width: 1500px;
+    margin-left: 50%;
+    transform: translateX(-50%);
+  }
+  .ko-bracket {
+    gap: 1rem;
+    margin: 0 auto;
+  }
+}
+
 /* ================================================================
    Compare view
    ================================================================ */
@@ -2229,18 +2244,40 @@ main {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* Keep the header from overflowing horizontally now that it also holds the
+     language switcher: let the controls wrap and drop the (space-hungry) name. */
   .header-user {
     margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 0.4rem;
   }
   .user-name {
-    max-width: 110px;
-    font-size: 0.78rem;
+    display: none;
   }
 
   main {
     padding: 0.75rem;
     /* Clear the fixed bottom nav bar. */
     padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  /* Mobile bracket: one round per screen, swipe between rounds (no big tree gaps). */
+  .ko-bracket {
+    gap: 0.75rem;
+  }
+  .ko-bracket-scroll {
+    scroll-snap-type: x mandatory;
+  }
+  .ko-col {
+    width: calc(100vw - 1.5rem);
+    scroll-snap-align: start;
+  }
+  .ko-col-body {
+    justify-content: flex-start;
+  }
+  .ko-col:not([data-round="final"]) .ko-col-body .match-card::after {
+    display: none;
   }
 
   .match-body {
