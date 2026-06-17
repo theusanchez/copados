@@ -783,12 +783,16 @@ function renderKnockoutView() {
   koFillLocked = !groupStageReady(predictions);
   const rounds = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
 
-  const tabsHtml = rounds.map((r, i) =>
-    `<button class="ko-tab${i === 0 ? ' active' : ''}" data-round="${r}">${ROUND_LABELS[r]}</button>`
-  ).join('');
-
-  const panelsHtml = rounds.map((r, i) =>
-    `<div class="ko-panel${i === 0 ? '' : ' hidden'}" id="ko-panel-${r}"></div>`
+  // The main bracket is the tree r32 → r16 → qf → sf → final, laid out as
+  // horizontally-scrollable columns (each column's nodes spread with space-around so
+  // they align against their feeders in the previous column). Third place is a
+  // consolation match, shown separately below the tree.
+  const treeRounds = ['r32', 'r16', 'qf', 'sf', 'final'];
+  const colsHtml = treeRounds.map(r =>
+    `<div class="ko-col" data-round="${r}">
+       <div class="ko-col-head">${ROUND_LABELS[r]}</div>
+       <div class="ko-col-body" id="ko-col-${r}"></div>
+     </div>`
   ).join('');
 
   const lockNotice = koFillLocked ? `
@@ -799,26 +803,21 @@ function renderKnockoutView() {
 
   container.innerHTML = `
     ${lockNotice}
-    <div class="ko-tabs-wrapper">
-      <div class="ko-tabs">${tabsHtml}</div>
+    <div class="ko-hint">Arraste para o lado para ver todas as fases →</div>
+    <div class="ko-bracket-scroll">
+      <div class="ko-bracket">${colsHtml}</div>
     </div>
-    <div class="ko-panels">${panelsHtml}</div>
+    <div class="ko-third">
+      <div class="ko-col-head ko-third-head">${ROUND_LABELS.third}</div>
+      <div class="ko-col-body" id="ko-col-third"></div>
+    </div>
   `;
 
   rounds.forEach(r => renderKnockoutRound(r));
-
-  container.querySelectorAll('.ko-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      container.querySelectorAll('.ko-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      container.querySelectorAll('.ko-panel').forEach(p => p.classList.add('hidden'));
-      container.querySelector(`#ko-panel-${tab.dataset.round}`).classList.remove('hidden');
-    });
-  });
 }
 
 function renderKnockoutRound(round) {
-  const panel = document.getElementById(`ko-panel-${round}`);
+  const panel = document.getElementById(`ko-col-${round}`);
   if (!panel) return;
   const { koMatches } = recomputeAll();
   const matches = KNOCKOUT[round];

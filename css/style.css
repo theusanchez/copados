@@ -666,8 +666,7 @@ main {
   width: max-content;
 }
 
-.group-tab,
-.ko-tab {
+.group-tab {
   background: var(--card);
   border: 1px solid var(--border);
   color: var(--subtext);
@@ -678,14 +677,12 @@ main {
   transition: all var(--transition);
 }
 
-.group-tab:hover,
-.ko-tab:hover {
+.group-tab:hover {
   color: var(--text);
   border-color: var(--subtext);
 }
 
-.group-tab.active,
-.ko-tab.active {
+.group-tab.active {
   background: var(--primary);
   border-color: var(--primary);
   color: #fff;
@@ -1191,19 +1188,111 @@ main {
   text-transform: none;
 }
 
-.ko-tabs-wrapper {
+/* ----- Knockout bracket ----- */
+.ko-hint {
+  font-size: 0.75rem;
+  color: var(--subtext);
+  margin-bottom: 0.6rem;
+}
+.ko-bracket-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  margin-bottom: 1rem;
+  padding-bottom: 0.6rem;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
-
-.ko-tabs {
+.ko-bracket {
   display: flex;
-  gap: 0.35rem;
-  padding: 0.25rem;
+  gap: 1.4rem;
   width: max-content;
+  align-items: stretch;
+}
+.ko-col {
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+}
+.ko-col-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--subtext);
+  padding: 0.3rem 0;
+  margin-bottom: 0.4rem;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 999px;
+}
+.ko-col-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  flex: 1;
+  gap: 0.5rem;
+}
+/* Connector stubs that hint the tree (each node reaches toward the next column). */
+.ko-col:not([data-round="final"]) .ko-col-body .match-card {
+  position: relative;
+}
+.ko-col:not([data-round="final"]) .ko-col-body .match-card::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 1.4rem;
+  height: 1px;
+  background: var(--hairline);
+}
+
+/* Compact the reused match cards into bracket nodes. */
+.ko-col-body .match-card .match-kickoff,
+.ko-third .match-card .match-kickoff {
+  display: none;
+}
+.ko-col-body .match-body,
+.ko-third .match-body {
+  padding: 0.55rem 0.6rem;
+  gap: 0.3rem;
+}
+.ko-col-body .team,
+.ko-third .team {
+  min-width: 0;
+}
+.ko-col-body .team-name,
+.ko-third .team-name {
+  font-size: 0.74rem;
+  line-height: 1.15;
+}
+.ko-col-body .score-input,
+.ko-third .score-input {
+  width: 34px;
+  height: 32px;
+  font-size: 0.95rem;
+  border-width: 1px;
+}
+.ko-col-body .flag-icon,
+.ko-third .flag-icon {
+  width: 1.2em;
+}
+.ko-col-body .score-area,
+.ko-third .score-area {
+  gap: 0.2rem;
+}
+
+.ko-third {
+  margin-top: 1.5rem;
+  max-width: 320px;
+}
+.ko-third-head {
+  position: static;
+  background: none;
+  margin-bottom: 0.5rem;
 }
 
 /* ================================================================
