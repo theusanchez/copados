@@ -600,7 +600,7 @@ function renderGroupMatches(groupKey) {
     const matches = group.matches.filter(m => m.md === md);
     return `
       <div class="matchday">
-        <h3 class="matchday-label">Rodada ${md}</h3>
+        <h3 class="matchday-label">${t('groups.matchday', { n: md })}</h3>
         ${matches.map(m => renderMatchCard(m, false)).join('')}
       </div>
     `;
@@ -642,18 +642,18 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
       pred.home !== '' && pred.away !== '';
     penHtml = `
       <div class="pen-section${showPen ? '' : ' hidden'}" id="pen-${match.id}">
-        <span class="pen-label">Pens:</span>
+        <span class="pen-label">${t('pens.label')}</span>
         <label class="pen-option">
           <input type="radio" name="pen-${match.id}" value="${hTeam}"
             ${pred.penWinner === hTeam ? 'checked' : ''} ${locked ? 'disabled' : ''}
             class="pen-radio" data-match-id="${match.id}">
-          <span>${flag(hTeam)} ${hTeam}</span>
+          <span>${flag(hTeam)} ${tTeam(hTeam)}</span>
         </label>
         <label class="pen-option">
           <input type="radio" name="pen-${match.id}" value="${aTeam}"
             ${pred.penWinner === aTeam ? 'checked' : ''} ${locked ? 'disabled' : ''}
             class="pen-radio" data-match-id="${match.id}">
-          <span>${flag(aTeam)} ${aTeam}</span>
+          <span>${flag(aTeam)} ${tTeam(aTeam)}</span>
         </label>
       </div>`;
   }
@@ -663,21 +663,21 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
       ${headerHtml}
       <div class="match-body">
         <div class="team home-team">
-          <span class="team-name">${hTeam}</span>
+          <span class="team-name">${tTeam(hTeam)}</span>
           <span class="team-flag">${flag(hTeam)}</span>
         </div>
         <div class="score-area">
           <input type="number" min="0" max="20" class="score-input"
             data-match-id="${match.id}" data-side="home"
-            value="${hVal}" ${lockAttrs} aria-label="Placar ${hTeam}">
+            value="${hVal}" ${lockAttrs} aria-label="${t('aria.score', { team: tTeam(hTeam) })}">
           <span class="score-sep">×</span>
           <input type="number" min="0" max="20" class="score-input"
             data-match-id="${match.id}" data-side="away"
-            value="${aVal}" ${lockAttrs} aria-label="Placar ${aTeam}">
+            value="${aVal}" ${lockAttrs} aria-label="${t('aria.score', { team: tTeam(aTeam) })}">
         </div>
         <div class="team away-team">
           <span class="team-flag">${flag(aTeam)}</span>
-          <span class="team-name">${aTeam}</span>
+          <span class="team-name">${tTeam(aTeam)}</span>
         </div>
       </div>
       ${penHtml}
@@ -690,11 +690,11 @@ function renderLiveScore(r, isKnockout) {
   const paused = r.status === 'paused';
   const h = r.home ?? 0, a = r.away ?? 0;
   const score = isKnockout
-    ? `${flag(r.homeTeam)} ${r.homeTeam} ${h} × ${a} ${r.awayTeam} ${flag(r.awayTeam)}`
+    ? `${flag(r.homeTeam)} ${tTeam(r.homeTeam)} ${h} × ${a} ${tTeam(r.awayTeam)} ${flag(r.awayTeam)}`
     : `${h} × ${a}`;
   return `<div class="match-live${paused ? ' paused' : ''}">
       <span class="live-dot" aria-hidden="true"></span>
-      <span class="live-label">${paused ? 'INTERVALO' : 'AO VIVO'}</span>
+      <span class="live-label">${paused ? t('live.half') : t('live.now')}</span>
       <span class="live-score">${score}</span>
     </div>`;
 }
@@ -738,7 +738,7 @@ function renderStandingsTable(groupKey) {
 
     return `<tr class="${rowClass}">
       <td class="rank-cell">${i + 1}</td>
-      <td class="team-cell">${flag(s.team)} ${s.team}</td>
+      <td class="team-cell">${flag(s.team)} ${tTeam(s.team)}</td>
       <td>${s.played}</td>
       <td>${s.gf}</td>
       <td>${s.gd >= 0 ? '+' : ''}${s.gd}</td>
@@ -747,23 +747,23 @@ function renderStandingsTable(groupKey) {
   }).join('');
 
   return `
-    <table class="standings-table" aria-label="Classificação Grupo ${groupKey}">
+    <table class="standings-table" aria-label="${t('standings.aria', { group: groupKey })}">
       <thead>
         <tr>
           <th>#</th>
-          <th>Seleção</th>
-          <th title="Jogos">PJ</th>
-          <th title="Gols">G</th>
-          <th title="Saldo de Gols">SG</th>
-          <th title="Pontos">PTS</th>
+          <th>${t('standings.team')}</th>
+          <th title="${t('std.playedT')}">${t('std.played')}</th>
+          <th title="${t('std.gfT')}">${t('std.gf')}</th>
+          <th title="${t('std.gdT')}">${t('std.gd')}</th>
+          <th title="${t('std.ptsT')}">${t('std.pts')}</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="standings-legend">
-      <span class="legend-dot rank-1st-dot"></span> Classificado (1°)
-      <span class="legend-dot rank-2nd-dot"></span> Classificado (2°)
-      <span class="legend-dot rank-3rd-dot"></span> Melhor 3°
+      <span class="legend-dot rank-1st-dot"></span> ${t('std.q1')}
+      <span class="legend-dot rank-2nd-dot"></span> ${t('std.q2')}
+      <span class="legend-dot rank-3rd-dot"></span> ${t('std.q3')}
     </div>`;
 }
 
@@ -795,25 +795,22 @@ function renderKnockoutView() {
   const treeRounds = ['r32', 'r16', 'qf', 'sf', 'final'];
   const colsHtml = treeRounds.map(r =>
     `<div class="ko-col" data-round="${r}">
-       <div class="ko-col-head">${ROUND_LABELS[r]}</div>
+       <div class="ko-col-head">${t('round.' + r)}</div>
        <div class="ko-col-body" id="ko-col-${r}"></div>
      </div>`
   ).join('');
 
-  const lockNotice = koFillLocked ? `
-    <div class="ko-locked-notice">
-      🔒 Complete a <strong>fase de grupos</strong> para preencher o mata-mata.
-      Por enquanto você pode acompanhar como o chaveamento está ficando.
-    </div>` : '';
+  const lockNotice = koFillLocked
+    ? `<div class="ko-locked-notice">${t('ko.locked')}</div>` : '';
 
   container.innerHTML = `
     ${lockNotice}
-    <div class="ko-hint">Arraste para o lado para ver todas as fases →</div>
+    <div class="ko-hint">${t('ko.hint')}</div>
     <div class="ko-bracket-scroll">
       <div class="ko-bracket">${colsHtml}</div>
     </div>
     <div class="ko-third">
-      <div class="ko-col-head ko-third-head">${ROUND_LABELS.third}</div>
+      <div class="ko-col-head ko-third-head">${t('round.third')}</div>
       <div class="ko-col-body" id="ko-col-third"></div>
     </div>
   `;
@@ -880,8 +877,10 @@ function refreshKnockoutTeams() {
       const awayNameEl = card.querySelector('.away-team .team-name');
       const homeFlagEl = card.querySelector('.home-team .team-flag');
       const awayFlagEl = card.querySelector('.away-team .team-flag');
-      if (homeNameEl) homeNameEl.textContent = km.homeTeam;
-      if (awayNameEl) awayNameEl.textContent = km.awayTeam;
+      // Display uses the active language; pen-radio VALUE stays the canonical pt name
+      // (it's the identity compared by the scoring engine).
+      if (homeNameEl) homeNameEl.textContent = tTeam(km.homeTeam);
+      if (awayNameEl) awayNameEl.textContent = tTeam(km.awayTeam);
       if (homeFlagEl) homeFlagEl.innerHTML = flag(km.homeTeam);
       if (awayFlagEl) awayFlagEl.innerHTML = flag(km.awayTeam);
 
@@ -892,13 +891,13 @@ function refreshKnockoutTeams() {
         radios[0].name = `pen-${m.id}`;
         radios[0].dataset.matchId = m.id;
         const label0 = radios[0].closest('label');
-        if (label0) label0.querySelector('span').innerHTML = `${flag(km.homeTeam)} ${km.homeTeam}`;
+        if (label0) label0.querySelector('span').innerHTML = `${flag(km.homeTeam)} ${tTeam(km.homeTeam)}`;
 
         radios[1].value = km.awayTeam;
         radios[1].name = `pen-${m.id}`;
         radios[1].dataset.matchId = m.id;
         const label1 = radios[1].closest('label');
-        if (label1) label1.querySelector('span').innerHTML = `${flag(km.awayTeam)} ${km.awayTeam}`;
+        if (label1) label1.querySelector('span').innerHTML = `${flag(km.awayTeam)} ${tTeam(km.awayTeam)}`;
       }
     });
   });

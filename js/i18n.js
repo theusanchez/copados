@@ -63,6 +63,11 @@ const DICT = {
     'groups.matchday': 'Rodada {n}',
     'standings.aria': 'Classificação Grupo {group}',
     'standings.team': 'Seleção',
+    'std.played': 'PJ', 'std.playedT': 'Jogos',
+    'std.gf': 'G', 'std.gfT': 'Gols',
+    'std.gd': 'SG', 'std.gdT': 'Saldo de Gols',
+    'std.pts': 'PTS', 'std.ptsT': 'Pontos',
+    'std.q1': 'Classificado (1°)', 'std.q2': 'Classificado (2°)', 'std.q3': 'Melhor 3°',
 
     // --- knockout ---
     'ko.locked': '🔒 Complete a <strong>fase de grupos</strong> para preencher o mata-mata. Por enquanto você pode acompanhar como o chaveamento está ficando.',
@@ -78,6 +83,12 @@ const DICT = {
     'fx.today': 'Hoje',
     'fx.tomorrow': 'Amanhã',
     'fx.empty': 'O calendário aparece aqui assim que os horários dos jogos forem publicados.',
+
+    // --- match card ---
+    'live.now': 'AO VIVO',
+    'live.half': 'INTERVALO',
+    'aria.score': 'Placar {team}',
+    'pens.label': 'Pens:',
 
     // --- common ---
     'common.loading': 'Carregando...',
@@ -171,6 +182,11 @@ const DICT = {
     'groups.matchday': 'Matchday {n}',
     'standings.aria': 'Group {group} standings',
     'standings.team': 'Team',
+    'std.played': 'P', 'std.playedT': 'Played',
+    'std.gf': 'GF', 'std.gfT': 'Goals for',
+    'std.gd': 'GD', 'std.gdT': 'Goal difference',
+    'std.pts': 'PTS', 'std.ptsT': 'Points',
+    'std.q1': 'Qualified (1st)', 'std.q2': 'Qualified (2nd)', 'std.q3': 'Best 3rd',
 
     'ko.locked': '🔒 Finish the <strong>group stage</strong> to fill in the knockout. For now you can watch the bracket take shape.',
     'ko.hint': 'Swipe sideways to see every round →',
@@ -184,6 +200,11 @@ const DICT = {
     'fx.today': 'Today',
     'fx.tomorrow': 'Tomorrow',
     'fx.empty': 'The schedule shows up here once kickoff times are published.',
+
+    'live.now': 'LIVE',
+    'live.half': 'HALF-TIME',
+    'aria.score': '{team} score',
+    'pens.label': 'Pens:',
 
     'common.loading': 'Loading...',
     'common.refresh': '↻ Refresh',
