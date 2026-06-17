@@ -176,24 +176,55 @@ async function main() {
     }
   }
 
-  // 3) Persist only what changed — keeps writes (and the live listeners' read cost)
-  //    proportional to actual updates instead of rewriting every doc each run.
+  // 3) Persist only what changed. Reading the existing docs is what powers the diff
+  //    (so we don't rewrite unchanged docs and spam the live `onSnapshot` listeners),
+  //    but that read also costs quota — and reading all ~104 docs once a minute blows
+  //    the free daily read budget on its own. So the minute-by-minute external trigger
+  //    (repository_dispatch) reads/writes ONLY the matches in the active window — or
+  //    nothing at all when no game is near — while the slower backup schedule and any
+  //    manual/local run do a full reconciling sync of every doc (seeds fixtures/kickoffs,
+  //    resolves knockout slots, and catches anything the window missed).
   const db = admin.firestore();
+  const fullSync = process.env.GITHUB_EVENT_NAME !== 'repository_dispatch' || process.env.FULL_SYNC === '1';
+
+  // Active = currently playing, or kicking off within 2h, or finished within ~4h —
+  // enough margin to catch scheduled→live→finished on the flaky free feed.
+  const now = Date.now();
+  const WINDOW_BEFORE_MS = 2 * 60 * 60 * 1000;
+  const WINDOW_AFTER_MS = 4 * 60 * 60 * 1000;
+  const isActive = d => {
+    if (d.status === 'live' || d.status === 'paused') return true;
+    const ko = d.kickoff?.toMillis?.() ?? null;
+    return ko != null && ko >= now - WINDOW_AFTER_MS && ko <= now + WINDOW_BEFORE_MS;
+  };
+  const activeIds = Object.keys(docs).filter(id => isActive(docs[id]));
+
+  if (!fullSync && activeIds.length === 0) {
+    console.log(`No match in the active window; skipping Firestore read/write. API returned ${matches.length} matches.`);
+    return;
+  }
+
+  const idsToSync = fullSync ? Object.keys(docs) : activeIds;
   const existing = {};
   try {
-    const existingSnap = await db.collection('results').get();
-    existingSnap.forEach(d => { existing[d.id] = d.data(); });
+    if (fullSync) {
+      const snap = await db.collection('results').get();
+      snap.forEach(d => { existing[d.id] = d.data(); });
+    } else {
+      const snaps = await db.getAll(...idsToSync.map(id => db.collection('results').doc(id)));
+      snaps.forEach(d => { if (d.exists) existing[d.id] = d.data(); });
+    }
   } catch (e) {
-    console.warn('Could not read existing results, writing all:', e.message);
+    console.warn('Could not read existing results, writing all considered:', e.message);
   }
 
   const batch = db.batch();
   let writes = 0;
-  for (const [id, d] of Object.entries(docs)) {
-    if (!resultChanged(existing[id], d)) continue;
+  for (const id of idsToSync) {
+    if (!resultChanged(existing[id], docs[id])) continue;
     batch.set(
       db.collection('results').doc(id),
-      { ...d, updatedAt: admin.firestore.FieldValue.serverTimestamp() },
+      { ...docs[id], updatedAt: admin.firestore.FieldValue.serverTimestamp() },
       { merge: true }
     );
     writes++;
@@ -201,7 +232,8 @@ async function main() {
   if (writes) await batch.commit();
 
   const finished = Object.values(docs).filter(d => d.status === 'finished').length;
-  console.log(`Wrote ${writes} changed result(s) of ${Object.keys(docs).length} mapped (${finished} finished). API returned ${matches.length} matches.`);
+  const mode = fullSync ? 'full' : `window(${activeIds.length})`;
+  console.log(`[${mode}] Wrote ${writes} changed result(s) of ${idsToSync.length} considered / ${Object.keys(docs).length} mapped (${finished} finished). API returned ${matches.length} matches.`);
   if (unmapped.length) {
     console.warn(`\n${unmapped.length} API match(es) not mapped to an app ID (check draw/team names):`);
     unmapped.forEach(u => console.warn('  - ' + u));
