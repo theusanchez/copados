@@ -1971,8 +1971,24 @@ main {
     color-mix(in srgb, var(--rank-1) 16%, var(--card)),
     var(--card)
   );
-  box-shadow: 0 12px 32px -14px
-    color-mix(in srgb, var(--rank-1) 55%, transparent);
+  animation: champ-glow 4s ease-in-out infinite;
+}
+/* Calm, slow glow on the champion card — celebratory but not distracting. */
+@keyframes champ-glow {
+  0%,
+  100% {
+    box-shadow: 0 12px 28px -16px
+      color-mix(in srgb, var(--rank-1) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 14px 36px -12px
+      color-mix(in srgb, var(--rank-1) 70%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .podium-1 {
+    animation: none;
+  }
 }
 .podium-2 {
   order: 1;
