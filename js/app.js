@@ -722,9 +722,19 @@ function renderLiveScore(r, isKnockout) {
 
 // A match is "in play" (showing a live scoreline) while live or at halftime.
 // Gated by the liveScores flag — the free data source's live data is unreliable.
+//
+// Sanity guard: a match lasts ~2h (≤~3h with extra time + penalties in the
+// knockout). The free feed sometimes never reports FINISHED — and the cron is
+// flaky — so a doc can stay stuck on 'live'/'paused' indefinitely, leaving a
+// long-finished game showing "AO VIVO". Past this margin from kickoff we stop
+// trusting the live status regardless of what the feed says.
+const LIVE_MAX_MS = 3.5 * 60 * 60 * 1000;
 function isInPlay(r) {
   if (!FEATURES.liveScores) return false;
-  return r?.status === 'live' || r?.status === 'paused';
+  if (r?.status !== 'live' && r?.status !== 'paused') return false;
+  const ms = kickoffMs(r?.kickoff);
+  if (ms != null && Date.now() - ms > LIVE_MAX_MS) return false;
+  return true;
 }
 
 // Real result + points earned, shown once a match is finished.

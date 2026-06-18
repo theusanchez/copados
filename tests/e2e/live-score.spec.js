@@ -33,6 +33,23 @@ test('live match inputs are locked', async ({ page }) => {
     .toHaveAttribute('readonly', '');
 });
 
+test('a match stuck on "live" long past kickoff drops the live badge', async ({ page }) => {
+  // The free feed sometimes never reports FINISHED, leaving a doc stuck on 'live'.
+  // A game can't still be in play 5h after kickoff — stop trusting the status.
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [user('me', 'Eu')],
+    predictions: {},
+    results: {
+      A1: { status: 'live', home: 2, away: 0, homeTeam: 'México', awayTeam: 'África do Sul', kickoff: Date.now() - 5 * 60 * 60 * 1000 },
+    },
+  });
+
+  await expect(page.locator('#match-A1 .match-live')).toHaveCount(0);
+  await expect(page.locator('#match-A1')).not.toHaveClass(/\blive\b/);
+  await expect(page.locator('#match-A1 .match-kickoff')).toBeVisible();
+});
+
 test('a scheduled match shows kickoff time, not a live badge', async ({ page }) => {
   await boot(page, {
     currentUser: user('me', 'Eu'),
