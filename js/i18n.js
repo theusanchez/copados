@@ -47,6 +47,9 @@ const DICT = {
     // --- knockout reset notice ---
     'reset.text': '⚠️ Corrigimos um erro no chaveamento do <strong>mata-mata</strong>. Seus palpites dessa fase foram resetados — por favor, <strong>preencha novamente</strong>.',
     'reset.close': 'Fechar aviso',
+    'update.text': '🎉 Uma nova versão chegou!',
+    'update.action': 'Atualizar',
+    'update.dismiss': 'Agora não',
 
     // --- guest gate ---
     'guest.ranking': 'o ranking',
@@ -217,6 +220,9 @@ const DICT = {
 
     'reset.text': '⚠️ We fixed a bug in the <strong>knockout</strong> bracket. Your knockout picks were reset — please fill them in again.',
     'reset.close': 'Dismiss notice',
+    'update.text': '🎉 A new version is here!',
+    'update.action': 'Update',
+    'update.dismiss': 'Not now',
 
     'guest.ranking': 'the ranking',
     'guest.leagues': 'the leagues',

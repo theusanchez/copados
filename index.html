@@ -376,12 +376,63 @@
       </div>
     </div>
 
+    <!-- "New version available" prompt (shown by app.js when the SW updates) -->
+    <div id="update-toast" class="update-toast hidden" role="alert"></div>
+
     <script type="module" src="js/app.js"></script>
     <script>
       const __E2E__ = new URLSearchParams(location.search).has("e2e");
       if ("serviceWorker" in navigator && !__E2E__) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("sw.js").catch(() => {});
+        let refreshing = false;
+        // The new SW took control (after we told it to SKIP_WAITING) — reload once
+        // so the page runs the fresh code.
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
+
+        window.addEventListener("load", async () => {
+          let reg;
+          try {
+            reg = await navigator.serviceWorker.register("sw.js");
+          } catch {
+            return;
+          }
+
+          // Tell app.js a new version is waiting; it renders the update prompt.
+          const notify = (worker) => {
+            window.__swWaiting = worker;
+            window.dispatchEvent(
+              new CustomEvent("sw-waiting", { detail: worker }),
+            );
+          };
+
+          // A SW was already waiting when the page loaded.
+          if (reg.waiting && navigator.serviceWorker.controller)
+            notify(reg.waiting);
+
+          // A new SW started installing — wait for it to be ready.
+          reg.addEventListener("updatefound", () => {
+            const installing = reg.installing;
+            if (!installing) return;
+            installing.addEventListener("statechange", () => {
+              if (
+                installing.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
+                notify(installing);
+              }
+            });
+          });
+
+          // Check for a new deploy periodically and when the app regains focus, so
+          // the prompt can appear without a manual close/reopen.
+          setInterval(() => reg.update().catch(() => {}), 30 * 60 * 1000);
+          document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible")
+              reg.update().catch(() => {});
+          });
         });
       }
     </script>

@@ -280,6 +280,32 @@ async function applyKnockoutReset(uid) {
   return koIds.length > 0;
 }
 
+// "New version available" prompt. The SW registration in index.html dispatches
+// `sw-waiting` (and stashes `window.__swWaiting`) when a new build is installed and
+// waiting; we show a toast and apply it on tap (SKIP_WAITING → controllerchange →
+// reload, handled in index.html).
+function initUpdatePrompt() {
+  if (window.__swWaiting) showUpdateToast(window.__swWaiting);
+  window.addEventListener('sw-waiting', e => showUpdateToast(e.detail));
+}
+
+function showUpdateToast(worker) {
+  const el = document.getElementById('update-toast');
+  if (!el || !worker) return;
+  el.innerHTML = `
+    <span class="update-toast-text">${t('update.text')}</span>
+    <button class="update-toast-action" type="button">${t('update.action')}</button>
+    <button class="update-toast-close" type="button" aria-label="${t('update.dismiss')}">×</button>`;
+  el.classList.remove('hidden');
+  el.querySelector('.update-toast-action').addEventListener('click', () => {
+    worker.postMessage({ type: 'SKIP_WAITING' });
+  });
+  el.querySelector('.update-toast-close').addEventListener('click', () => {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+  });
+}
+
 function showResetNotice() {
   const el = document.getElementById('reset-notice');
   if (!el) return;
@@ -387,6 +413,7 @@ applyTheme(document.documentElement.dataset.theme || 'classico');
 // rare action and far simpler/safer than re-running every render function.
 document.documentElement.lang = lang === 'en' ? 'en' : 'pt-BR';
 applyStaticI18n();
+initUpdatePrompt();
 document.querySelectorAll('.lang-btn').forEach(btn => {
   btn.setAttribute('aria-pressed', String(btn.dataset.lang === lang));
   btn.addEventListener('click', () => {
