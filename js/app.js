@@ -1787,6 +1787,20 @@ async function renderAdminView() {
   const { users: roster, preds } = await loadRoster();
   const users = scopeUsers(roster);
 
+  // --- 0) Last 15 registered users (from the roster already loaded — no extra read) ---
+  const recent = [...roster]
+    .filter(u => kickoffMs(u.createdAt) != null)
+    .sort((a, b) => kickoffMs(b.createdAt) - kickoffMs(a.createdAt))
+    .slice(0, 15);
+  const recentHtml = `
+    <div class="admin-card">
+      <h3 class="admin-card-title">${t('admin.recent')}</h3>
+      ${recent.length
+        ? `<ol class="admin-recent">${recent.map(u =>
+            `<li><span class="admin-recent-name">${escapeHtml(u.displayName)}</span><span class="admin-muted">${timeAgo(kickoffMs(u.createdAt))}</span></li>`).join('')}</ol>`
+        : `<p class="admin-muted">${t('admin.recentEmpty')}</p>`}
+    </div>`;
+
   // --- 1) System health (from the results collection) ---
   const resList = Object.values(results);
   const byStatus = { scheduled: 0, live: 0, paused: 0, finished: 0 };
@@ -1884,6 +1898,7 @@ async function renderAdminView() {
     <div class="admin-grid">
       ${healthHtml}
       ${readsHtml}
+      ${recentHtml}
       ${engHtml}
       ${overviewHtml}
     </div>`;

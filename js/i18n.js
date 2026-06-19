@@ -113,6 +113,8 @@ const DICT = {
     'compare.tabGroups': 'Grupos',
     'compare.tabKnockout': 'Mata-Mata',
     // --- admin dashboard ---
+    'admin.recent': 'Últimos cadastrados',
+    'admin.recentEmpty': 'Nenhum cadastro registrado ainda.',
     'admin.health': 'Saúde do sistema',
     'admin.scheduled': 'Agendados',
     'admin.live': 'Ao vivo',
@@ -279,6 +281,8 @@ const DICT = {
     'compare.tabGroups': 'Groups',
     'compare.tabKnockout': 'Knockout',
     // --- admin dashboard ---
+    'admin.recent': 'Recently registered',
+    'admin.recentEmpty': 'No registrations recorded yet.',
     'admin.health': 'System health',
     'admin.scheduled': 'Scheduled',
     'admin.live': 'Live',

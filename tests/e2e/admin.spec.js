@@ -26,7 +26,7 @@ const seedData = () => ({
   },
 });
 
-test('admin sees the Admin tab and the four dashboard cards', async ({ page }) => {
+test('admin sees the Admin tab and the dashboard cards', async ({ page }) => {
   await boot(page, seedData());
 
   const tab = page.locator('.nav-tab[data-view="admin"]');
@@ -34,13 +34,36 @@ test('admin sees the Admin tab and the four dashboard cards', async ({ page }) =
   await tab.click();
 
   const view = page.locator('#view-admin');
-  await expect(view.locator('.admin-card-title')).toHaveCount(4);
+  await expect(view.locator('.admin-card-title')).toHaveCount(5);
   await expect(view).toContainText('Saúde do sistema');
-  await expect(view).toContainText('Engajamento');
   await expect(view).toContainText('Estimativa de leituras');
+  await expect(view).toContainText('Últimos cadastrados');
+  await expect(view).toContainText('Engajamento');
   await expect(view).toContainText('Visão geral do bolão');
   // Engagement table lists both users in scope.
   await expect(view.locator('.admin-table tbody tr')).toHaveCount(2);
+});
+
+test('admin sees the last registered users, newest first and capped at 15', async ({ page }) => {
+  const now = Date.now();
+  const users = Array.from({ length: 18 }, (_, i) =>
+    user('u' + i, 'Player ' + i, { createdAt: now - i * 3600000 }));
+  await boot(page, {
+    currentUser: users[0],
+    users,
+    predictions: { u0: fullPreds() },
+    results: {},
+    leagues: [],
+  });
+
+  const tab = page.locator('.nav-tab[data-view="admin"]');
+  await tab.click();
+  const view = page.locator('#view-admin');
+
+  // Recent list is capped at 15 and ordered newest-first (u0 created most recently).
+  const recent = view.locator('.admin-recent li');
+  await expect(recent).toHaveCount(15);
+  await expect(recent.first()).toContainText('Player 0');
 });
 
 test('non-admin never sees the Admin tab', async ({ page }) => {

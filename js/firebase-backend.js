@@ -95,12 +95,18 @@ export function createFirebaseBackend() {
       // Don't persist email: this doc is readable by every signed-in user
       // (ranking/compare need displayName + photoURL), so email would leak as PII.
       // Firebase Auth already holds the email for the account owner.
-      await setDoc(doc(db, 'users', user.uid), {
+      const ref = doc(db, 'users', user.uid);
+      const payload = {
         uid: user.uid,
         displayName: user.displayName,
         photoURL: user.photoURL,
         updatedAt: serverTimestamp(),
-      }, { merge: true });
+      };
+      // Stamp createdAt exactly once (powers the admin "last registered" list). One
+      // read per login session — negligible next to the roster reads ranking does.
+      const snap = await getDoc(ref);
+      if (!snap.exists() || !snap.data().createdAt) payload.createdAt = serverTimestamp();
+      await setDoc(ref, payload, { merge: true });
     },
 
     // Deep-merge a single match into the `matches` map: only that key changes, the

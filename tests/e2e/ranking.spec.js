@@ -42,6 +42,27 @@ test('single played round shows round points and no movement (estreia)', async (
   await expect(podium(page, 1).locator('.ranking-round-pts')).toHaveText('+8');
 });
 
+test('podium with long names never overflows the viewport horizontally', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [
+      user('me', 'Eu da Silva Sauro Magalhães'),
+      user('alice', 'Alice Aparecida Albuquerque'),
+      user('bob', 'Bob Bartolomeu Bittencourt'),
+    ],
+    predictions: PREDS,
+    results: { ...RESULTS_R1 },
+  });
+  await page.locator('.nav-tab[data-view="ranking"]').click();
+  await expect(podium(page, 1)).toBeVisible();
+
+  // The podium must fit; a wider scrollWidth means it bleeds the page horizontally.
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
 test('second round recomputes points and position movement', async ({ page }) => {
   await boot(page, {
     currentUser: user('me', 'Eu'),

@@ -1951,7 +1951,7 @@ main {
 /* ----- Podium (top 3) ----- */
 .podium {
   display: grid;
-  grid-template-columns: 1fr 1.18fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.18fr) minmax(0, 1fr);
   align-items: end;
   gap: 0.5rem;
   margin-bottom: 1.1rem;
@@ -1967,6 +1967,7 @@ main {
   align-items: center;
   gap: 0.35rem;
   text-align: center;
+  min-width: 0;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2582,6 +2583,34 @@ main {
   color: var(--subtext);
   font-weight: 400;
   margin-left: 0.1rem;
+}
+.admin-recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: admin-recent;
+}
+.admin-recent li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.85rem;
+}
+.admin-recent li::before {
+  counter-increment: admin-recent;
+  content: counter(admin-recent) ".";
+  color: var(--subtext);
+  font-variant-numeric: tabular-nums;
+}
+.admin-recent-name {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .admin-champs {
   margin-top: 0.85rem;
