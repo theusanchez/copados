@@ -85,9 +85,13 @@ Knockout only scores when the predicted matchup equals the real one.
 - **`js/data.js` is the REAL official 2026 draw** — not simulated. Verified vs Wikipedia
   / NBC. Don't "fix" the teams.
 - **Knockout bracket flow** follows the official 2026 bracket (matched slot-by-slot).
-  If you ever restructure the knockout, bump `KNOCKOUT_RESET_VERSION` in `app.js` — that
-  triggers a one-off server-side wipe of users' stale knockout picks + a notice banner
-  (`getResetVersion`/`setResetVersion`/`deletePreds`, version stored on the user doc).
+  There used to be a boot-time auto-reset (`KNOCKOUT_RESET_VERSION` +
+  `applyKnockoutReset`) that wiped stale knockout picks when the bracket changed —
+  **removed 2026-06-19** because the version flag didn't persist reliably, so the reset
+  re-ran every boot and repeatedly deleted users' refilled knockout picks (data loss).
+  If you ever restructure the knockout again, do NOT reintroduce a destructive
+  boot-time wipe; prefer a guarded, idempotent server-side migration (Admin SDK) run
+  once, out-of-band — never delete picks from the client boot path.
 - **Service worker**: bump `VERSION` in `sw.js` whenever you change a cached asset. The
   fetch strategy is **network-first for HTML/JS/CSS** (so deploys are picked up) and
   stale-while-revalidate for other assets. **Do NOT add `?v=` query strings to asset

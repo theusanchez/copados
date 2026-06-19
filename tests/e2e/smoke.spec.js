@@ -36,7 +36,6 @@ test('a fully-filled user opens on the fixtures tab', async ({ page }) => {
     currentUser: user('me', 'Eu Mesmo'),
     users: [user('me', 'Eu Mesmo')],
     predictions: { me: fullPreds() },
-    resetVersions: { me: 1 }, // already migrated → keep the full bolão
   });
 
   await expect(page.locator('#view-fixtures')).toBeVisible();

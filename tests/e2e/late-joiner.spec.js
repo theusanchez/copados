@@ -17,7 +17,6 @@ test('a late joiner with locked group games can still fill the knockout', async 
       A1: { status: 'finished', home: 1, away: 0, homeTeam: 'México', awayTeam: 'África do Sul', kickoff: 1 },
       A2: { status: 'finished', home: 2, away: 2, homeTeam: 'Coreia do Sul', awayTeam: 'República Tcheca', kickoff: 2 },
     },
-    resetVersions: { me: 1 },
   });
 
   await page.locator('.nav-tab[data-view="knockout"]').click();

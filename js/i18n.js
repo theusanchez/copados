@@ -45,8 +45,6 @@ const DICT = {
     'progress.detail': 'Grupos {group}/{groupTotal} · Mata-mata {ko}/{koTotal}',
 
     // --- knockout reset notice ---
-    'reset.text': '⚠️ Corrigimos um erro no chaveamento do <strong>mata-mata</strong>. Seus palpites dessa fase foram resetados — por favor, <strong>preencha novamente</strong>.',
-    'reset.close': 'Fechar aviso',
     'update.text': '🎉 Uma nova versão chegou!',
     'update.action': 'Atualizar',
     'update.dismiss': 'Agora não',
@@ -220,8 +218,6 @@ const DICT = {
     'progress.remaining': '<strong>{done}</strong> of {total} predictions left',
     'progress.detail': 'Groups {group}/{groupTotal} · Knockout {ko}/{koTotal}',
 
-    'reset.text': '⚠️ We fixed a bug in the <strong>knockout</strong> bracket. Your knockout picks were reset — please fill them in again.',
-    'reset.close': 'Dismiss notice',
     'update.text': '🎉 A new version is here!',
     'update.action': 'Update',
     'update.dismiss': 'Not now',

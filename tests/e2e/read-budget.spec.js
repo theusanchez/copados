@@ -16,7 +16,7 @@ const PREDS = {
 const reads = page => page.evaluate(() => window.__reads.userPreds);
 
 test('navigating between tabs does not re-read predictions', async ({ page }) => {
-  await boot(page, { currentUser: user('me', 'Eu'), users: USERS, predictions: PREDS, resetVersions: { me: 1 } });
+  await boot(page, { currentUser: user('me', 'Eu'), users: USERS, predictions: PREDS });
 
   await page.locator('.nav-tab[data-view="ranking"]').click();
   await expect(page.locator('#view-ranking')).toBeVisible();
@@ -42,7 +42,6 @@ test('a live score update re-renders the ranking without re-reading', async ({ p
     users: USERS,
     predictions: PREDS,
     results: { A1: { status: 'scheduled', homeTeam: 'México', awayTeam: 'África do Sul', kickoff: Date.now() } },
-    resetVersions: { me: 1 },
   });
 
   await page.locator('.nav-tab[data-view="ranking"]').click();
@@ -61,7 +60,7 @@ test('a live score update re-renders the ranking without re-reading', async ({ p
 });
 
 test('editing your own picks updates the ranking from cache (no read)', async ({ page }) => {
-  await boot(page, { currentUser: user('me', 'Eu'), users: USERS, predictions: PREDS, resetVersions: { me: 1 } });
+  await boot(page, { currentUser: user('me', 'Eu'), users: USERS, predictions: PREDS });
 
   await page.locator('.nav-tab[data-view="ranking"]').click();
   const before = await reads(page);

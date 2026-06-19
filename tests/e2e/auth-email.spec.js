@@ -68,7 +68,6 @@ test('a user saved without a name shows a fallback, never the string "null"', as
     currentUser: user('me', 'Eu'),
     users: [user('me', 'Eu'), { uid: 'x', displayName: null, email: 'x@example.com', photoURL: null }],
     predictions: { x: { A1: { home: 1, away: 0 } } },
-    resetVersions: { me: 1 },
   });
 
   await page.locator('.nav-tab[data-view="ranking"]').click();
