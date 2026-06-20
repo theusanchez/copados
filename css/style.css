@@ -2134,6 +2134,39 @@ main {
   width: auto;
 }
 
+/* Round scope selector (Geral / per-round) above the ranking. */
+.rank-scope {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  margin-bottom: 1rem;
+  padding-bottom: 0.15rem;
+}
+.rank-scope-btn {
+  flex: 0 0 auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--subtext);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all var(--transition);
+}
+.rank-scope-btn:hover {
+  color: var(--text);
+  border-color: var(--subtext);
+}
+.rank-scope-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
 /* ================================================================
    Responsive adjustments
    ================================================================ */

@@ -17,6 +17,7 @@ let userLeagues = [];       // private leagues the current user belongs to
 let activeLeagueId = 'geral'; // 'geral' = everyone; otherwise a private league id
 let unsubscribeResults = null; // active Firestore results listener, if any
 let fixturesScrollPending = false; // login opened Jogos before results loaded; scroll once they arrive
+let rankingRound = 'overall'; // ranking view scope: 'overall' or a RANKING_ROUNDS index
 
 const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
 
@@ -1624,7 +1625,26 @@ async function renderRankingView() {
 
   const nameCmp = (a, b) => (a.user.displayName || '').localeCompare(b.user.displayName || '');
 
+  // Scope: 'overall' = accumulated total; a round index = only the points earned in
+  // that round (score up to it minus up to the previous one). Falls back to overall
+  // if the chosen round hasn't been played yet.
+  const roundMode = rankingRound !== 'overall' && playedIdx.includes(rankingRound);
+  const scopeIdx = roundMode ? rankingRound : null;
+
   const entries = users.map(u => {
+    if (roundMode) {
+      const upTo = scoreUser(preds[u.uid], resultsUpTo(scopeIdx));
+      const before = scopeIdx > 0
+        ? scoreUser(preds[u.uid], resultsUpTo(scopeIdx - 1))
+        : { total: 0, exact: 0, correct: 0 };
+      return {
+        user: u,
+        total: upTo.total - before.total,
+        exact: upTo.exact - before.exact,
+        correct: upTo.correct - before.correct,
+        prev: null, prevTotal: 0, roundExact: 0, streak: 0, perfect: 0, nostradamus: false,
+      };
+    }
     const cur = scoreUser(preds[u.uid], results);
     const prev = prevResults ? scoreUser(preds[u.uid], prevResults) : null;
     return {
@@ -1642,20 +1662,23 @@ async function renderRankingView() {
     b.total - a.total || b.exact - a.exact || b.correct - a.correct || nameCmp(a, b));
   curOrder.forEach((e, i) => { e.pos = i + 1; });
 
-  if (prevResults) {
+  if (!roundMode && prevResults) {
     const prevOrder = [...entries].sort((a, b) =>
       b.prev.total - a.prev.total || b.prev.exact - a.prev.exact ||
       b.prev.correct - a.prev.correct || nameCmp(a, b));
     prevOrder.forEach((e, i) => { e.prevPos = i + 1; });
   }
 
+  // Movement arrows, "+X this round" deltas and accumulated achievements only make
+  // sense in the overall scope; per-round view shows just that round's points.
+  const showMovement = !roundMode && !!prevResults;
   const roundBadgeFor = (e) => {
     const roundPts = e.total - e.prevTotal;
-    return hasResults && roundPts > 0
+    return !roundMode && hasResults && roundPts > 0
       ? `<span class="ranking-round-pts">+${roundPts}</span>` : '';
   };
-  const isLeaderOf = (e) => hasResults && e.pos === 1 && e.total > 0;
-  const isRoundTopOf = (e) => hasResults && maxRoundExact > 0 && e.roundExact === maxRoundExact;
+  const isLeaderOf = (e) => !roundMode && hasResults && e.pos === 1 && e.total > 0;
+  const isRoundTopOf = (e) => !roundMode && hasResults && maxRoundExact > 0 && e.roundExact === maxRoundExact;
 
   // Every card but your own opens the comparison modal (you vs them).
   const clickAttrs = (e, isMe) => isMe ? '' :
@@ -1672,7 +1695,7 @@ async function renderRankingView() {
         ${avatarHtml(e.user, 'podium-avatar')}
         <span class="podium-name">${escapeHtml(e.user.displayName)}${isMe ? t('rank.me') : ''}</span>
         <span class="podium-total">${e.total}<small>pts</small></span>
-        <span class="podium-meta">${movementChip(e, !!prevResults)}${roundBadgeFor(e)}</span>
+        <span class="podium-meta">${movementChip(e, showMovement)}${roundBadgeFor(e)}</span>
         ${badgesFor(e, isLeaderOf(e), isRoundTopOf(e))}
       </div>`;
   };
@@ -1682,7 +1705,7 @@ async function renderRankingView() {
     return `
       <div class="ranking-row${isMe ? ' ranking-row-me' : ' rank-clickable'}"${clickAttrs(e, isMe)}>
         <span class="ranking-pos">${e.pos}</span>
-        ${movementChip(e, !!prevResults)}
+        ${movementChip(e, showMovement)}
         ${avatarHtml(e.user, 'ranking-avatar')}
         <div class="ranking-info">
           <span class="ranking-name">${escapeHtml(e.user.displayName)}${isMe ? t('rank.me') : ''}</span>
@@ -1703,12 +1726,25 @@ async function renderRankingView() {
 
   const empty = hasResults ? '' :
     `<p class="ranking-empty">${t('rank.empty')}</p>`;
-  const roundNote = hasResults
-    ? `<p class="ranking-round-note">${t('rank.note', { round: t(RANKING_ROUNDS[lastIdx].label) })}</p>`
+  // Scope selector: "Geral" + one pill per round already played. Only shown once
+  // there are results to scope by.
+  const activeScope = roundMode ? scopeIdx : 'overall';
+  const scopeTabs = hasResults
+    ? [{ key: 'overall', label: t('rank.overall') }]
+        .concat(playedIdx.map(i => ({ key: i, label: t(RANKING_ROUNDS[i].label) })))
+    : [];
+  const scopeHtml = scopeTabs.length
+    ? `<div class="rank-scope" role="tablist" aria-label="${t('rank.scopeLabel')}">${scopeTabs.map(tb => {
+        const on = tb.key === activeScope;
+        return `<button class="rank-scope-btn${on ? ' active' : ''}" type="button" role="tab" aria-selected="${on}" data-scope="${tb.key}">${tb.label}</button>`;
+      }).join('')}</div>`
     : '';
+  const roundNote = roundMode || !hasResults ? '' :
+    `<p class="ranking-round-note">${t('rank.note', { round: t(RANKING_ROUNDS[lastIdx].label) })}</p>`;
 
   container.innerHTML = `
     <div class="compare-header"><h2>${t('nav.ranking')} · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>
+    ${scopeHtml}
     ${empty}
     ${roundNote}
     ${podiumHtml}
@@ -1718,6 +1754,14 @@ async function renderRankingView() {
   attachAvatarFallback(container);
   wireLeagueSwitcher(container, renderRankingView);
   wireRefresh(container, renderRankingView);
+
+  container.querySelectorAll('.rank-scope-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const s = btn.dataset.scope;
+      rankingRound = s === 'overall' ? 'overall' : Number(s);
+      renderRankingView();
+    });
+  });
 
   container.querySelectorAll('.rank-clickable[data-uid]').forEach(card => {
     const open = () => openComparison(card.dataset.uid, users, preds);

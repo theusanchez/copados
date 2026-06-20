@@ -63,6 +63,35 @@ test('podium with long names never overflows the viewport horizontally', async (
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+test('round selector scopes the ranking to a single round', async ({ page }) => {
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: USERS,
+    predictions: PREDS,
+    results: { ...RESULTS_R1, ...RESULTS_R2 },
+  });
+  await page.locator('.nav-tab[data-view="ranking"]').click();
+
+  const scope = page.locator('.rank-scope');
+  await expect(scope).toBeVisible();
+  await expect(scope.locator('.rank-scope-btn')).toHaveCount(3); // Geral + Rodada 1 + Rodada 2
+
+  // Overall: Eu leads with the accumulated 18.
+  await expect(podium(page, 1)).toContainText('Eu');
+  await expect(podium(page, 1).locator('.podium-total')).toContainText('18');
+
+  // Round 1 only: Eu 8, Bob 8, Alice 6 → Bob tops on the name tiebreak.
+  await page.locator('.rank-scope-btn[data-scope="0"]').click();
+  await expect(podium(page, 1)).toContainText('Bob');
+
+  // Round 2 only: Eu 10, Alice 6, Bob 0 → Eu tops with just that round's points.
+  await page.locator('.rank-scope-btn[data-scope="1"]').click();
+  await expect(podium(page, 1)).toContainText('Eu');
+  await expect(podium(page, 1).locator('.podium-total')).toContainText('10');
+  // Per-round view drops the "+X this round" delta chip.
+  await expect(page.locator('#view-ranking .ranking-round-pts')).toHaveCount(0);
+});
+
 test('second round recomputes points and position movement', async ({ page }) => {
   await boot(page, {
     currentUser: user('me', 'Eu'),

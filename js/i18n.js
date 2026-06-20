@@ -173,6 +173,8 @@ const DICT = {
     'rank.stats': '{exact} cravadas · {correct} resultados',
     'rank.empty': 'Os jogos ainda não começaram — o ranking aparece assim que os primeiros resultados saírem.',
     'rank.note': 'Última rodada pontuada: <strong>{round}</strong> — o <span class="rank-move rank-move-up">▲</span>/<span class="rank-move rank-move-down">▼</span> mostra a variação desde a rodada anterior.',
+    'rank.overall': 'Geral',
+    'rank.scopeLabel': 'Ver ranking por',
     'rank.me': ' (eu)',
 
     // --- badges ---
@@ -339,6 +341,8 @@ const DICT = {
     'rank.stats': '{exact} exact · {correct} outcomes',
     'rank.empty': "The matches haven't started yet — the ranking appears once the first results come in.",
     'rank.note': 'Last scored round: <strong>{round}</strong> — the <span class="rank-move rank-move-up">▲</span>/<span class="rank-move rank-move-down">▼</span> shows the change since the previous round.',
+    'rank.overall': 'Overall',
+    'rank.scopeLabel': 'View ranking by',
     'rank.me': ' (you)',
 
     'badge.leader': 'League leader',
