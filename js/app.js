@@ -66,6 +66,20 @@ function formatKickoff(kickoff) {
   return KICKOFF_FMT.format(new Date(ms)).replace(/\./g, '');
 }
 
+// Short date (no time) for round date ranges — "11 jun".
+const ROUND_DATE_FMT = new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'pt-BR', {
+  timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short',
+});
+const fmtRoundDay = ms => ROUND_DATE_FMT.format(new Date(ms)).replace(/\./g, '');
+
+// Date span of a round's matches, from their kickoffs — "11 jun" or "11 jun – 13 jun".
+function roundDateLabel(ids) {
+  const ks = ids.map(id => kickoffMs(results[id]?.kickoff)).filter(x => x != null);
+  if (!ks.length) return '';
+  const from = fmtRoundDay(Math.min(...ks)), to = fmtRoundDay(Math.max(...ks));
+  return from === to ? from : `${from} – ${to}`;
+}
+
 // Escape user-controlled text (display names, league names) before it goes into
 // innerHTML — prevents stored XSS from a malicious displayName / league name.
 function escapeHtml(s) {
@@ -1739,8 +1753,13 @@ async function renderRankingView() {
         return `<button class="rank-scope-btn${on ? ' active' : ''}" type="button" role="tab" aria-selected="${on}" data-scope="${tb.key}">${tb.label}</button>`;
       }).join('')}</div>`
     : '';
-  const roundNote = roundMode || !hasResults ? '' :
-    `<p class="ranking-round-note">${t('rank.note', { round: t(RANKING_ROUNDS[lastIdx].label) })}</p>`;
+  let roundNote = '';
+  if (roundMode) {
+    const date = roundDateLabel(RANKING_ROUNDS[scopeIdx].ids);
+    if (date) roundNote = `<p class="ranking-round-note">${t('rank.roundDate', { date })}</p>`;
+  } else if (hasResults) {
+    roundNote = `<p class="ranking-round-note">${t('rank.note', { round: t(RANKING_ROUNDS[lastIdx].label) })}</p>`;
+  }
 
   container.innerHTML = `
     <div class="compare-header"><h2>${t('nav.ranking')} · ${activeLeagueName()}</h2>${leagueSwitcherHtml()}${refreshBtnHtml}</div>

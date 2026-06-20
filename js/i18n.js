@@ -175,6 +175,7 @@ const DICT = {
     'rank.note': 'Última rodada pontuada: <strong>{round}</strong> — o <span class="rank-move rank-move-up">▲</span>/<span class="rank-move rank-move-down">▼</span> mostra a variação desde a rodada anterior.',
     'rank.overall': 'Geral',
     'rank.scopeLabel': 'Ver ranking por',
+    'rank.roundDate': '📅 Disputada em {date}',
     'rank.me': ' (eu)',
 
     // --- badges ---
@@ -343,6 +344,7 @@ const DICT = {
     'rank.note': 'Last scored round: <strong>{round}</strong> — the <span class="rank-move rank-move-up">▲</span>/<span class="rank-move rank-move-down">▼</span> shows the change since the previous round.',
     'rank.overall': 'Overall',
     'rank.scopeLabel': 'View ranking by',
+    'rank.roundDate': '📅 Played on {date}',
     'rank.me': ' (you)',
 
     'badge.leader': 'League leader',

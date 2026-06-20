@@ -90,6 +90,8 @@ test('round selector scopes the ranking to a single round', async ({ page }) => 
   await expect(podium(page, 1).locator('.podium-total')).toContainText('10');
   // Per-round view drops the "+X this round" delta chip.
   await expect(page.locator('#view-ranking .ranking-round-pts')).toHaveCount(0);
+  // ...and shows the round's date instead.
+  await expect(page.locator('#view-ranking .ranking-round-note')).toContainText('Disputada em');
 });
 
 test('second round recomputes points and position movement', async ({ page }) => {
