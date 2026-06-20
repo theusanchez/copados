@@ -95,9 +95,10 @@ export function createFakeBackend() {
     async saveUser(user) {
       if (user.isAnonymous) return;
       const i = state.users.findIndex(u => u.uid === user.uid);
-      const rec = { uid: user.uid, displayName: user.displayName, email: user.email, photoURL: user.photoURL };
+      const now = Date.now();
+      const rec = { uid: user.uid, displayName: user.displayName, email: user.email, photoURL: user.photoURL, updatedAt: now };
       if (i >= 0) state.users[i] = { ...state.users[i], ...rec };
-      else state.users.push({ ...rec, createdAt: Date.now() });
+      else state.users.push({ ...rec, createdAt: now });
     },
 
     async savePred(uid, matchId, data) {

@@ -1742,6 +1742,15 @@ function timeAgo(ms) {
   return t('admin.dAgo', { n: Math.round(h / 24) });
 }
 
+// Absolute date+time (BRT) for the access/registration lists — "20/06 16:30".
+const ADMIN_DT_FMT = new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'pt-BR', {
+  timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit',
+  hour: '2-digit', minute: '2-digit',
+});
+function fmtDateTime(ms) {
+  return ms == null ? '—' : ADMIN_DT_FMT.format(new Date(ms));
+}
+
 async function renderAdminView() {
   const container = document.getElementById('view-admin');
   if (!isAdmin()) { container.innerHTML = ''; return; }
@@ -1750,19 +1759,27 @@ async function renderAdminView() {
   const { users: roster, preds } = await loadRoster();
   const users = scopeUsers(roster);
 
-  // --- 0) Last 15 registered users (from the roster already loaded — no extra read) ---
-  const recent = [...roster]
-    .filter(u => kickoffMs(u.createdAt) != null)
-    .sort((a, b) => kickoffMs(b.createdAt) - kickoffMs(a.createdAt))
-    .slice(0, 15);
-  const recentHtml = `
+  // Both lists come from the roster already loaded — no extra reads. `updatedAt` is
+  // stamped by saveUser on every login (≈ last access); `createdAt` is the real
+  // registration time. Guests never enter the users collection, so they're excluded.
+  const listCard = (titleKey, emptyKey, cls, tsField, rows) => `
     <div class="admin-card">
-      <h3 class="admin-card-title">${t('admin.recent')}</h3>
-      ${recent.length
-        ? `<ol class="admin-recent">${recent.map(u =>
-            `<li><span class="admin-recent-name">${escapeHtml(u.displayName)}</span><span class="admin-muted">${timeAgo(kickoffMs(u.createdAt))}</span></li>`).join('')}</ol>`
-        : `<p class="admin-muted">${t('admin.recentEmpty')}</p>`}
+      <h3 class="admin-card-title">${t(titleKey)}</h3>
+      ${rows.length
+        ? `<ol class="${cls}">${rows.map(u =>
+            `<li><span class="admin-recent-name">${escapeHtml(u.displayName)}</span><span class="admin-muted">${fmtDateTime(kickoffMs(u[tsField]))}</span></li>`).join('')}</ol>`
+        : `<p class="admin-muted">${t(emptyKey)}</p>`}
     </div>`;
+
+  const byField = field => [...roster]
+    .filter(u => kickoffMs(u[field]) != null)
+    .sort((a, b) => kickoffMs(b[field]) - kickoffMs(a[field]))
+    .slice(0, 15);
+
+  // --- 0a) Last 15 accesses (most recent login first) ---
+  const accessHtml = listCard('admin.lastAccess', 'admin.lastAccessEmpty', 'admin-recent', 'updatedAt', byField('updatedAt'));
+  // --- 0b) Last 15 registrations (most recent signup first) ---
+  const recentHtml = listCard('admin.recent', 'admin.recentEmpty', 'admin-recent', 'createdAt', byField('createdAt'));
 
   // --- 1) System health (from the results collection) ---
   const resList = Object.values(results);
@@ -1861,6 +1878,7 @@ async function renderAdminView() {
     <div class="admin-grid">
       ${healthHtml}
       ${readsHtml}
+      ${accessHtml}
       ${recentHtml}
       ${engHtml}
       ${overviewHtml}
