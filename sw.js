@@ -2,7 +2,7 @@
 // Goal: make the app installable and fast on repeat loads. Firebase calls always
 // hit the network (auth/Firestore are dynamic), so we only manage same-origin GETs.
 
-const VERSION = 'v46';
+const VERSION = 'v47';
 const CACHE = `copados-${VERSION}`;
 
 // App shell — resolved relative to the SW location (repo root), so it works under
@@ -16,6 +16,7 @@ const SHELL = [
   'js/firebase-backend.js',
   'js/config.js',
   'js/data.js',
+  'js/squads.js',
   'js/engine.js',
   'js/venues.js',
   'js/features.js',

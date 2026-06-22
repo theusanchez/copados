@@ -1,0 +1,13 @@
+{
+  "name": "copados-squads-build",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bakes FIFA World Cup squads from football-data.org into the static js/squads.js module.",
+  "scripts": {
+    "build": "node build-squads.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

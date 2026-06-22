@@ -1,5 +1,6 @@
 import { loginWithGoogle, logout, onAuthChange, loginAsGuest, registerWithEmail, loginWithEmail, sendMagicLink, completeMagicLinkIfPresent, upgradeGuest, upgradeGuestWithGoogle, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
-import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS } from './data.js';
+import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS, HONOURS } from './data.js';
+import { SQUADS } from './squads.js';
 import { venueLabel } from './venues.js';
 import { FEATURES } from './features.js';
 import { t, tTeam, lang, setLang, applyStaticI18n } from './i18n.js';
@@ -437,7 +438,7 @@ function switchMainView(view) {
   if (view === 'admin' && !isAdmin()) view = 'groups';
   // Optional chaining so a stale cached index.html (missing a newly-added view,
   // e.g. view-admin) can't crash the boot — the SW serves fresh HTML on next load.
-  ['fixtures', 'groups', 'knockout', 'ranking', 'leagues', 'admin'].forEach(v => {
+  ['fixtures', 'groups', 'knockout', 'teams', 'ranking', 'leagues', 'admin'].forEach(v => {
     document.getElementById(`view-${v}`)?.classList.toggle('hidden', v !== view);
   });
   document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -448,6 +449,7 @@ function switchMainView(view) {
     return;
   }
   if (view === 'fixtures') renderFixturesView({ scroll: true });
+  if (view === 'teams') renderTeamsView();
   if (view === 'ranking') renderRankingView();
   if (view === 'leagues') renderLeaguesView();
   if (view === 'admin') renderAdminView();
@@ -567,6 +569,147 @@ async function savePenWinner(matchId, team) {
 // -----------------------------------------------------------------------
 // Groups view
 // -----------------------------------------------------------------------
+// -----------------------------------------------------------------------
+// Teams (Seleções) view: per-nation squad, coach and World Cup honours.
+// Squad/coach come from the baked js/squads.js; honours are static (data.js).
+
+let selectedTeam = null; // PT team name whose detail panel is open, or null for the grid
+let teamsSort = 'group'; // grid ordering: 'group' | 'alpha' | 'titles' | 'copas'
+
+const POS_ORDER = ['GOL', 'DEF', 'MEI', 'ATA'];
+const TEAM_SORTS = ['group', 'alpha', 'titles', 'copas'];
+
+// Compare helpers for the non-grouped orderings; alpha is always the final tiebreak.
+function sortTeams(teams, mode) {
+  const byName = (a, b) => a.localeCompare(b, 'pt-BR');
+  const arr = [...teams];
+  if (mode === 'titles') {
+    return arr.sort((a, b) =>
+      (HONOURS[b]?.won || 0) - (HONOURS[a]?.won || 0) ||
+      (HONOURS[b]?.played || 0) - (HONOURS[a]?.played || 0) || byName(a, b));
+  }
+  if (mode === 'copas') {
+    return arr.sort((a, b) => (HONOURS[b]?.played || 0) - (HONOURS[a]?.played || 0) || byName(a, b));
+  }
+  return arr.sort(byName);
+}
+
+function ageFromDob(dob) {
+  if (!dob) return null;
+  const b = new Date(dob);
+  if (isNaN(b)) return null;
+  const now = new Date();
+  let age = now.getFullYear() - b.getFullYear();
+  const m = now.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--;
+  return age;
+}
+
+function renderTeamsView() {
+  const container = document.getElementById('view-teams');
+  if (selectedTeam && SQUADS[selectedTeam]) {
+    renderTeamDetail(container, selectedTeam);
+  } else {
+    renderTeamsGrid(container);
+  }
+}
+
+// A self-describing one-liner under the name: titles (with a star) + appearances,
+// or a debutant marker for teams whose only edition is 2026.
+function honoursLine(team) {
+  const h = HONOURS[team];
+  if (!h) return '';
+  if (h.played <= 1) return `${t('teams.line.debut')} · ${t('teams.line.firstCup')}`;
+  const parts = [];
+  if (h.won > 0) {
+    const word = h.won === 1 ? t('teams.line.title') : t('teams.line.titles');
+    parts.push(`<span class="ln-star">★</span> ${h.won} ${word}`);
+  }
+  parts.push(`${h.played} ${t('teams.line.cups')}`);
+  return parts.join(' · ');
+}
+
+function teamCard(team) {
+  return `
+    <button class="team-card" data-team="${escapeHtml(team)}" type="button">
+      ${flag(team)}
+      <span class="team-card-body">
+        <span class="team-card-name">${escapeHtml(team)}</span>
+        <span class="team-card-line">${honoursLine(team)}</span>
+      </span>
+      <span class="team-chevron" aria-hidden="true">›</span>
+    </button>`;
+}
+
+function renderTeamsGrid(container) {
+  const sortTabs = TEAM_SORTS.map(s =>
+    `<button class="group-tab${s === teamsSort ? ' active' : ''}" data-sort="${s}" type="button">${t('teams.sort.' + s)}</button>`
+  ).join('');
+  const control = `<div class="group-tabs-wrapper"><div class="group-tabs">${sortTabs}</div></div>`;
+
+  let body;
+  if (teamsSort === 'group') {
+    body = Object.entries(GROUPS).map(([g, { teams }]) =>
+      `<div class="team-group"><h3 class="team-group-label">${t('teams.group', { g })}</h3><div class="team-grid">${teams.map(teamCard).join('')}</div></div>`
+    ).join('');
+  } else {
+    const all = Object.values(GROUPS).flatMap(g => g.teams);
+    body = `<div class="team-grid">${sortTeams(all, teamsSort).map(teamCard).join('')}</div>`;
+  }
+
+  container.innerHTML = `<div class="teams-wrapper">${control}${body}</div>`;
+  container.querySelectorAll('.group-tab[data-sort]').forEach(tab => {
+    tab.addEventListener('click', () => { teamsSort = tab.dataset.sort; renderTeamsView(); });
+  });
+  container.querySelectorAll('.team-card').forEach(card => {
+    card.addEventListener('click', () => { selectedTeam = card.dataset.team; renderTeamsView(); });
+  });
+}
+
+function renderTeamDetail(container, team) {
+  const squad = SQUADS[team];
+  const h = HONOURS[team] || {};
+  const buckets = Object.fromEntries(POS_ORDER.map(p => [p, []]));
+  for (const p of squad.players) (buckets[p.group] || buckets.ATA).push(p);
+
+  const stats = `
+    <div class="team-stats">
+      <div class="team-stat"><span class="team-stat-val">${h.won ?? 0}</span><span class="team-stat-label">${t('teams.titles')}</span></div>
+      <div class="team-stat"><span class="team-stat-val">${h.played ?? '—'}</span><span class="team-stat-label">${t('teams.played')}</span></div>
+      <div class="team-stat"><span class="team-stat-val">${escapeHtml(h.best ?? '—')}</span><span class="team-stat-label">${t('teams.best')}</span></div>
+      <div class="team-stat"><span class="team-stat-val">${h.since ?? '—'}</span><span class="team-stat-label">${t('teams.since')}</span></div>
+    </div>`;
+
+  const squadHtml = squad.players.length
+    ? POS_ORDER.filter(p => buckets[p].length).map(p => `
+        <div class="squad-group">
+          <h4 class="squad-group-label">${t('teams.pos.' + p)}</h4>
+          <ul class="squad-list">
+            ${buckets[p].map(pl => {
+              const age = ageFromDob(pl.dob);
+              return `<li class="squad-player"><span class="player-name">${escapeHtml(pl.name)}</span>${age != null ? `<span class="player-age">${age} ${t('teams.years')}</span>` : ''}</li>`;
+            }).join('')}
+          </ul>
+        </div>`).join('')
+    : `<p class="squad-empty">${t('teams.noSquad')}</p>`;
+
+  container.innerHTML = `
+    <div class="team-detail">
+      <button class="team-back" type="button">← ${t('teams.back')}</button>
+      <div class="team-detail-head">
+        ${flag(team)}
+        <div>
+          <h2 class="team-detail-name">${escapeHtml(team)}</h2>
+          ${squad.coach ? `<p class="team-coach">${t('teams.coach')}: ${escapeHtml(squad.coach)}</p>` : ''}
+        </div>
+      </div>
+      ${stats}
+      ${h.note ? `<p class="team-note">ℹ️ ${escapeHtml(h.note)}</p>` : ''}
+      <div class="squad-groups">${squadHtml}</div>
+    </div>`;
+  container.querySelector('.team-back').addEventListener('click', () => { selectedTeam = null; renderTeamsView(); });
+}
+
 function renderGroupsView() {
   const container = document.getElementById('view-groups');
   currentUserKo = resolveKnockout(predictions);

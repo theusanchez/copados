@@ -2629,3 +2629,198 @@ main {
   padding: 0.2rem 0.55rem;
   margin: 0 0.35rem 0.35rem 0;
 }
+
+/* --- Teams (Seleções) view ------------------------------------------- */
+.teams-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.team-group-label {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: var(--subtext);
+  margin: 0 0 0.6rem;
+}
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.6rem;
+}
+.team-card {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 4.6rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color var(--transition),
+    transform var(--transition);
+}
+.team-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+.team-card .flag-icon {
+  height: 1.5em;
+  width: 2.25em;
+  flex-shrink: 0;
+}
+.team-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+.team-card-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.15;
+}
+.team-card-line {
+  font-size: 0.72rem;
+  color: var(--subtext);
+  line-height: 1.2;
+}
+.team-card-line .ln-star {
+  color: var(--gold);
+}
+.team-chevron {
+  flex-shrink: 0;
+  color: var(--subtext);
+  font-size: 1.2rem;
+  line-height: 1;
+  opacity: 0.55;
+}
+
+.team-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.team-back {
+  align-self: flex-start;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+.team-back:hover {
+  border-color: var(--primary);
+}
+.team-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.team-detail-head .flag-icon {
+  height: 2.4em;
+  width: 3.6em;
+  border-radius: var(--radius-sm);
+}
+.team-detail-name {
+  font-family: var(--font-display);
+  margin: 0;
+  font-size: 1.5rem;
+}
+.team-coach {
+  margin: 0.15rem 0 0;
+  color: var(--subtext);
+  font-size: 0.9rem;
+}
+.team-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+}
+.team-stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.team-stat-val {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+.team-stat-label {
+  font-size: 0.72rem;
+  color: var(--subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.squad-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.squad-group-label {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  color: var(--primary);
+  margin: 0 0 0.5rem;
+}
+.squad-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.4rem;
+}
+.squad-player {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.7rem;
+}
+.player-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.player-age {
+  font-size: 0.78rem;
+  color: var(--subtext);
+  white-space: nowrap;
+}
+.squad-empty {
+  color: var(--subtext);
+}
+.team-note {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--subtext);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
+}
+
+@media (max-width: 520px) {
+  .team-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
