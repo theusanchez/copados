@@ -21,10 +21,14 @@ test('ranking card opens the comparison modal with result and points', async ({ 
 
   const modal = page.locator('#cmp-modal');
   await expect(modal).toBeVisible();
-  const a1 = modal.locator('.cmp-match', { hasText: 'México' }).first();
-  // Official result row.
-  await expect(a1.locator('.cmp-row-official')).toContainText('Resultado');
-  await expect(a1.locator('.cmp-row-official')).toContainText('2 — 0');
+  // Aggregate scoreboard: me 5, Alice 3.
+  const sb = modal.locator('.cmp-scoreboard');
+  await expect(sb.locator('.cmp-sb-side').first()).toContainText('5');
+  await expect(sb.locator('.cmp-sb-side').last()).toContainText('3');
+  const a1 = modal.locator('.cmp-match', { hasText: 'MEX' }).first();
+  // Official result in the fixture header.
+  await expect(a1.locator('.cmp-fx-result')).toContainText('Resultado');
+  await expect(a1.locator('.cmp-fx-result')).toContainText('2 — 0');
   // Points: me cravou (+5), Alice acertou o resultado (+3).
   await expect(a1.locator('.cmp-pts-exact')).toHaveText('+5');
   await expect(a1.locator('.cmp-pts-partial')).toHaveText('+3');
@@ -64,7 +68,8 @@ test('no official result row before a match is finished', async ({ page }) => {
 
   const modal = page.locator('#cmp-modal');
   await expect(modal).toBeVisible();
-  const a1 = modal.locator('.cmp-match', { hasText: 'México' }).first();
-  await expect(a1.locator('.cmp-row-official')).toHaveCount(0);
+  const a1 = modal.locator('.cmp-match', { hasText: 'MEX' }).first();
+  await expect(a1.locator('.cmp-fx-result')).toHaveCount(0);
+  await expect(a1.locator('.cmp-fx-x')).toHaveCount(1);
   await expect(a1.locator('.cmp-pts')).toHaveCount(0);
 });

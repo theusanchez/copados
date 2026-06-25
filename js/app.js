@@ -1,5 +1,5 @@
 import { loginWithGoogle, logout, onAuthChange, loginAsGuest, registerWithEmail, loginWithEmail, sendMagicLink, completeMagicLinkIfPresent, upgradeGuest, upgradeGuestWithGoogle, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
-import { GROUPS, FLAGS, KNOCKOUT, ROUND_LABELS, HONOURS } from './data.js';
+import { GROUPS, FLAGS, CODES, KNOCKOUT, ROUND_LABELS, HONOURS } from './data.js';
 import { SQUADS } from './squads.js';
 import { venueLabel } from './venues.js';
 import { FEATURES } from './features.js';
@@ -45,6 +45,15 @@ function flag(team) {
   const code = FLAGS[team];
   if (!code) return '';
   return `<img class="flag-icon" src="https://flagcdn.com/${code}.svg" alt="" loading="lazy">`;
+}
+
+// Compact team chip (flag + FIFA code) for the head-to-head comparison, where
+// full country names break the layout. The full name stays accessible via the
+// <abbr> title. `flagSide` mirrors the chip so home/away point inward.
+function teamChip(team, flagSide = 'left') {
+  const code = CODES[team] || tTeam(team);
+  const label = `<abbr class="cmp-code" title="${escapeHtml(tTeam(team))}">${code}</abbr>`;
+  return flagSide === 'left' ? `${flag(team)}${label}` : `${label}${flag(team)}`;
 }
 
 // Kickoff is stored as an absolute instant (UTC). Normalize Firestore Timestamp
@@ -1436,54 +1445,71 @@ function renderComparison(me, them) {
   const myName = t('compare.you');
   const themName = escapeHtml(them.user.displayName);
 
-  // --- Groups: shared fixtures, two stacked score rows ---
+  // One side (you / them) of a head-to-head row: name, predicted scoreline, and —
+  // once the match is finished — its points, with the whole cell tinted by outcome.
+  const side = (who, pred, line, pts, isMe) => {
+    const tone = pts === 5 ? 'cmp-side-exact' : pts === 3 ? 'cmp-side-partial' : pts === 0 ? 'cmp-side-zero' : '';
+    return `<div class="cmp-side ${isMe ? 'cmp-side-me' : 'cmp-side-them'} ${tone}">
+      <span class="cmp-side-who">${who}</span>
+      ${line}
+      ${cmpPoints(pts)}
+    </div>`;
+  };
+
+  // --- Groups: a shared fixture header (official result centered), then the two
+  // predictions laid out as parallel columns so they read at a glance. ---
   const groupsHtml = Object.keys(GROUPS).map(g => {
+    let myG = 0, themG = 0, anyFinished = false;
     const matches = GROUPS[g].matches.map(m => {
       const mp = me.preds[m.id], tp = them.preds[m.id];
       const bothFilled = mp && tp && mp.home != null && mp.away != null && tp.home != null && tp.away != null;
       const same = bothFilled && Number(mp.home) === Number(tp.home) && Number(mp.away) === Number(tp.away);
-      const badge = bothFilled
-        ? (same ? `<span class="cmp-badge cmp-ok">${t('cmp.same')}</span>` : `<span class="cmp-badge cmp-diff">${t('cmp.diff')}</span>`)
-        : '';
       const r = results[m.id];
       const finished = r && r.status === 'finished' && r.home != null && r.away != null;
       const mePts = finished ? matchPoints(m.id, me.preds, me.koMatches, results) : null;
       const themPts = finished ? matchPoints(m.id, them.preds, them.koMatches, results) : null;
-      const officialRow = finished
-        ? `<div class="cmp-row cmp-row-official"><span class="cmp-who">${t('cmp.result')}</span><span class="cmp-score">${r.home} — ${r.away}</span></div>`
-        : '';
+      if (finished) { myG += mePts; themG += themPts; anyFinished = true; }
+      const mid = finished
+        ? `<span class="cmp-fx-result">${r.home} — ${r.away}<span class="cmp-fx-label">${t('cmp.result')}</span></span>`
+        : '<span class="cmp-fx-x">×</span>';
+      const eq = same ? `<span class="cmp-eq" title="${t('cmp.same')}">=</span>` : '<span class="cmp-eq cmp-eq-empty"></span>';
+      const meLine = `<span class="cmp-side-score">${fmtScore(mp)}</span>`;
+      const themLine = `<span class="cmp-side-score">${fmtScore(tp)}</span>`;
       return `
         <div class="cmp-match">
           <div class="cmp-fixture">
-            <span class="cmp-fx-team">${flag(m.home)} ${tTeam(m.home)}</span>
-            <span class="cmp-fx-x">×</span>
-            <span class="cmp-fx-team">${tTeam(m.away)} ${flag(m.away)}</span>
+            <span class="cmp-fx-team cmp-fx-home">${teamChip(m.home, 'left')}</span>
+            <span class="cmp-fx-mid">${mid}</span>
+            <span class="cmp-fx-team cmp-fx-away">${teamChip(m.away, 'right')}</span>
           </div>
-          ${officialRow}
-          <div class="cmp-row"><span class="cmp-who">${myName}</span><span class="cmp-score">${fmtScore(mp)}</span>${cmpPoints(mePts)}</div>
-          <div class="cmp-row${same ? ' cmp-row-ok' : (bothFilled ? ' cmp-row-diff' : '')}">
-            <span class="cmp-who">${themName}</span><span class="cmp-score">${fmtScore(tp)}</span>${cmpPoints(themPts)}${badge}
+          <div class="cmp-vs-row">
+            ${side(myName, mp, meLine, mePts, true)}
+            ${eq}
+            ${side(themName, tp, themLine, themPts, false)}
           </div>
         </div>`;
     }).join('');
-    return `<div class="cmp-group"><h4 class="cmp-group-title">${t('cmp.group', { g })}</h4>${matches}</div>`;
+    const sub = anyFinished
+      ? `<span class="cmp-sub"><span class="cmp-sub-me">${myName} ${myG}</span> · <span class="cmp-sub-them">${themName} ${themG}</span></span>`
+      : '';
+    return `<div class="cmp-group"><div class="cmp-group-head"><h4 class="cmp-group-title">${t('cmp.group', { g })}</h4>${sub}</div>${matches}</div>`;
   }).join('');
 
-  // --- Knockout: teams differ per user, so each row is self-contained ---
+  // --- Knockout: teams differ per user, so each column carries its own matchup. ---
   const koLine = (km) => {
-    if (!km) return '<span class="cmp-ko-line">–</span>';
+    if (!km) return '<span class="cmp-ko-line cmp-ko-empty">–</span>';
     const score = (km.home != null && km.away != null) ? `${km.home} — ${km.away}` : '–';
     const pen = km.penWinner && km.home != null && km.away != null && Number(km.home) === Number(km.away)
-      ? ` <span class="cmp-pen">${t('compare.pen', { team: tTeam(km.penWinner) })}</span>` : '';
-    return `<span class="cmp-ko-line">${flag(km.homeTeam)} ${tTeam(km.homeTeam)} <strong>${score}</strong> ${tTeam(km.awayTeam)} ${flag(km.awayTeam)}${pen}</span>`;
+      ? `<span class="cmp-pen">${t('compare.pen', { team: tTeam(km.penWinner) })}</span>` : '';
+    return `<span class="cmp-ko-line">${teamChip(km.homeTeam, 'left')}<strong>${score}</strong>${teamChip(km.awayTeam, 'right')}${pen}</span>`;
   };
   const koOfficial = (m) => {
     const res = results[m.id];
     if (!res || res.status !== 'finished' || res.home == null || res.away == null) return '';
     const pen = res.penWinner && Number(res.home) === Number(res.away)
-      ? ` <span class="cmp-pen">${t('compare.pen', { team: tTeam(res.penWinner) })}</span>` : '';
-    return `<div class="cmp-row cmp-ko-row cmp-row-official"><span class="cmp-who">${t('cmp.result')}</span>` +
-      `<span class="cmp-ko-line">${flag(res.homeTeam)} ${tTeam(res.homeTeam)} <strong>${res.home} — ${res.away}</strong> ${tTeam(res.awayTeam)} ${flag(res.awayTeam)}${pen}</span></div>`;
+      ? `<span class="cmp-pen">${t('compare.pen', { team: tTeam(res.penWinner) })}</span>` : '';
+    return `<div class="cmp-ko-official"><span class="cmp-fx-label">${t('cmp.result')}</span>` +
+      `<span class="cmp-ko-line">${teamChip(res.homeTeam, 'left')}<strong>${res.home} — ${res.away}</strong>${teamChip(res.awayTeam, 'right')}${pen}</span></div>`;
   };
   const rounds = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
   const koHtml = rounds.map(r => {
@@ -1495,18 +1521,33 @@ function renderComparison(me, them) {
       return `
       <div class="cmp-match cmp-ko-match">
         ${koOfficial(m)}
-        <div class="cmp-row cmp-ko-row"><span class="cmp-who">${myName}</span>${koLine(me.koMatches[m.id])}${cmpPoints(mePts)}</div>
-        <div class="cmp-row cmp-ko-row"><span class="cmp-who">${themName}</span>${koLine(them.koMatches[m.id])}${cmpPoints(themPts)}</div>
+        <div class="cmp-vs-row cmp-vs-ko">
+          ${side(myName, null, koLine(me.koMatches[m.id]), mePts, true)}
+          <span class="cmp-eq cmp-eq-empty"></span>
+          ${side(themName, null, koLine(them.koMatches[m.id]), themPts, false)}
+        </div>
       </div>`;
     }).join('');
-    return `<div class="cmp-group"><h4 class="cmp-group-title">${t('round.' + r)}</h4>${matches}</div>`;
+    return `<div class="cmp-group"><div class="cmp-group-head"><h4 class="cmp-group-title">${t('round.' + r)}</h4></div>${matches}</div>`;
   }).join('');
+
+  const myTotal = scoreUser(me.preds, results).total;
+  const themTotal = scoreUser(them.preds, results).total;
 
   modal.classList.remove('hidden');
   detail.innerHTML = `
     <div class="cmp-header">
       <h3>${myName} <span class="cmp-vs">vs</span> ${themName}</h3>
       <button class="cmp-close" type="button" aria-label="${t('compare.closeAria')}">×</button>
+    </div>
+    <div class="cmp-scoreboard">
+      <div class="cmp-sb-side ${myTotal > themTotal ? 'cmp-sb-lead' : ''}">
+        <span class="cmp-sb-name">${myName}</span><span class="cmp-sb-pts">${myTotal}</span>
+      </div>
+      <span class="cmp-sb-sep">·</span>
+      <div class="cmp-sb-side ${themTotal > myTotal ? 'cmp-sb-lead' : ''}">
+        <span class="cmp-sb-name">${themName}</span><span class="cmp-sb-pts">${themTotal}</span>
+      </div>
     </div>
     <div class="cmp-champions">
       <span>${t('compare.yourChampion', { flag: flag(me.champion), champion: tTeam(me.champion) })}</span>

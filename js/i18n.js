@@ -165,8 +165,7 @@ const DICT = {
     'admin.minAgo': 'há {n} min',
     'admin.hAgo': 'há {n} h',
     'admin.dAgo': 'há {n} d',
-    'cmp.same': '✓ igual',
-    'cmp.diff': '✗ diverge',
+    'cmp.same': 'palpites iguais',
     'cmp.result': 'Resultado',
     'cmp.group': 'Grupo {g}',
 
@@ -360,8 +359,7 @@ const DICT = {
     'admin.minAgo': '{n} min ago',
     'admin.hAgo': '{n} h ago',
     'admin.dAgo': '{n} d ago',
-    'cmp.same': '✓ same',
-    'cmp.diff': '✗ differs',
+    'cmp.same': 'same prediction',
     'cmp.result': 'Result',
     'cmp.group': 'Group {g}',
 

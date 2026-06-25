@@ -15,6 +15,24 @@ export const FLAGS = {
   'Inglaterra': 'gb-eng', 'Croácia': 'hr', 'Gana': 'gh', 'Panamá': 'pa',
 };
 
+// Official FIFA 3-letter codes — compact, international (same in PT/EN), and never
+// wrap. Used where the full country name would break the layout (e.g. the
+// head-to-head comparison cards). Falls back to the display name when absent.
+export const CODES = {
+  'México': 'MEX', 'África do Sul': 'RSA', 'Coreia do Sul': 'KOR', 'República Tcheca': 'CZE',
+  'Canadá': 'CAN', 'Bósnia e Herzegovina': 'BIH', 'Catar': 'QAT', 'Suíça': 'SUI',
+  'Brasil': 'BRA', 'Marrocos': 'MAR', 'Haiti': 'HAI', 'Escócia': 'SCO',
+  'Estados Unidos': 'USA', 'Paraguai': 'PAR', 'Austrália': 'AUS', 'Turquia': 'TUR',
+  'Alemanha': 'GER', 'Curaçao': 'CUW', 'Costa do Marfim': 'CIV', 'Equador': 'ECU',
+  'Holanda': 'NED', 'Japão': 'JPN', 'Suécia': 'SWE', 'Tunísia': 'TUN',
+  'Bélgica': 'BEL', 'Egito': 'EGY', 'Irã': 'IRN', 'Nova Zelândia': 'NZL',
+  'Espanha': 'ESP', 'Cabo Verde': 'CPV', 'Arábia Saudita': 'KSA', 'Uruguai': 'URU',
+  'França': 'FRA', 'Senegal': 'SEN', 'Iraque': 'IRQ', 'Noruega': 'NOR',
+  'Argentina': 'ARG', 'Argélia': 'ALG', 'Áustria': 'AUT', 'Jordânia': 'JOR',
+  'Portugal': 'POR', 'Congo (RD)': 'COD', 'Uzbequistão': 'UZB', 'Colômbia': 'COL',
+  'Inglaterra': 'ENG', 'Croácia': 'CRO', 'Gana': 'GHA', 'Panamá': 'PAN',
+};
+
 export const GROUPS = {
   A: { teams: ['México', 'África do Sul', 'Coreia do Sul', 'República Tcheca'],
     matches: [
