@@ -19,6 +19,7 @@ let activeLeagueId = 'geral'; // 'geral' = everyone; otherwise a private league 
 let unsubscribeResults = null; // active Firestore results listener, if any
 let fixturesScrollPending = false; // login opened Jogos before results loaded; scroll once they arrive
 let rankingRound = 'overall'; // ranking view scope: 'overall' or a RANKING_ROUNDS index
+let fixturesDay = null;        // selected day (matchday key) in the Jogos view; null = auto
 
 const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
 
@@ -1195,23 +1196,43 @@ function refreshKnockoutTeams() {
 // -----------------------------------------------------------------------
 // Fixtures view (chronological, "what's today / locking soon")
 // -----------------------------------------------------------------------
+// Matchday boundary: WC 2026 is hosted across the Americas (UTC-4…-7), so a match
+// that kicks off after midnight in Brazil (UTC-3) is still the *previous* day at the
+// venue. Shift the day boundary back 6h so those late-night BRT games bucket with the
+// day they belong to (no real WC kickoff falls in the 06:00–12:00 BRT gap). Only the
+// bucketing shifts — the displayed kickoff time stays the real local-Brazil time.
+const MATCHDAY_SHIFT_MS = 6 * 60 * 60 * 1000;
+const matchdayDate = ms => new Date(ms - MATCHDAY_SHIFT_MS);
+
 const SP_DAY_KEY = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
 });
-const SP_DAY_LABEL = new Intl.DateTimeFormat('pt-BR', {
-  timeZone: 'America/Sao_Paulo', weekday: 'short', day: '2-digit', month: 'short',
+const SP_WEEKDAY = new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'pt-BR', {
+  timeZone: 'America/Sao_Paulo', weekday: 'short',
+});
+const SP_DAYNUM = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo', day: '2-digit',
 });
 
+// Stable per-day bucket key (after the matchday shift).
+function dayKey(ms) { return SP_DAY_KEY.format(matchdayDate(ms)); }
+
 function dayLabel(ms) {
-  const key = SP_DAY_KEY.format(new Date(ms));
-  const today = SP_DAY_KEY.format(new Date());
-  const tomorrow = SP_DAY_KEY.format(new Date(Date.now() + 86400000));
-  if (key === today) return t('fx.today');
-  if (key === tomorrow) return t('fx.tomorrow');
+  const key = dayKey(ms);
+  if (key === dayKey(Date.now())) return t('fx.today');
+  if (key === dayKey(Date.now() + 86400000)) return t('fx.tomorrow');
   const fmt = new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'pt-BR', {
     timeZone: 'America/Sao_Paulo', weekday: 'short', day: '2-digit', month: 'short',
   });
-  return fmt.format(new Date(ms)).replace(/\./g, '');
+  return fmt.format(matchdayDate(ms)).replace(/\./g, '');
+}
+
+// Two-line date-chip label: weekday (or HOJE) over the day number.
+function dayChipLabels(ms) {
+  const top = dayKey(ms) === dayKey(Date.now())
+    ? t('fx.today')
+    : SP_WEEKDAY.format(matchdayDate(ms)).replace(/\./g, '').toUpperCase();
+  return { top, num: SP_DAYNUM.format(matchdayDate(ms)) };
 }
 
 // Time remaining until a match locks (kickoff). Null once it has started.
@@ -1273,21 +1294,41 @@ function renderFixturesView({ scroll = false } = {}) {
   if (scroll) fixturesScrollPending = false;
   const focusId = scroll ? focusFixtureId(items) : null;
 
+  // Bucket by matchday (kickoff order preserved).
   const buckets = [];
   items.forEach(it => {
-    const label = dayLabel(it.ms);
+    const key = dayKey(it.ms);
     let b = buckets[buckets.length - 1];
-    if (!b || b.label !== label) { b = { label, items: [] }; buckets.push(b); }
+    if (!b || b.key !== key) {
+      b = { key, label: dayLabel(it.ms), chip: dayChipLabels(it.ms), items: [] };
+      buckets.push(b);
+    }
     b.items.push(it);
   });
 
+  // Visible day: the saved choice if still present, else the day of the current/next
+  // match, else the first day with an unplayed match, else the last day.
+  const focusKey = focusId ? dayKey(items.find(i => i.match.id === focusId).ms) : null;
+  const firstLiveKey = buckets.find(b => b.items.some(i => results[i.match.id]?.status !== 'finished'))?.key;
+  const selectedKey = (fixturesDay && buckets.some(b => b.key === fixturesDay))
+    ? fixturesDay
+    : (focusKey || firstLiveKey || buckets[buckets.length - 1].key);
+  fixturesDay = selectedKey;
+  const selected = buckets.find(b => b.key === selectedKey) || buckets[0];
+
+  const chipsHtml = buckets.map(b => `
+    <button class="fx-chip${b.key === selectedKey ? ' active' : ''}" type="button" data-day="${b.key}" aria-pressed="${b.key === selectedKey}">
+      <span class="fx-chip-top">${b.chip.top}</span>
+      <span class="fx-chip-num">${b.chip.num}</span>
+    </button>`).join('');
+
   container.innerHTML = `
     <div class="compare-header"><h2>${t('nav.fixtures')}</h2></div>
-    ${buckets.map(b => `
-      <div class="fx-day">
-        <h3 class="fx-day-label">${b.label}</h3>
-        ${b.items.map(it => renderFixtureCard(it, it.match.id === focusId)).join('')}
-      </div>`).join('')}`;
+    <div class="fx-days copa-scroll">${chipsHtml}</div>
+    <div class="fx-day">
+      <h3 class="fx-day-label">${selected.label}</h3>
+      ${selected.items.map(it => renderFixtureCard(it, it.match.id === focusId)).join('')}
+    </div>`;
 
   container.querySelectorAll('.score-input').forEach(input => {
     input.addEventListener('blur', () => {
@@ -1296,7 +1337,11 @@ function renderFixturesView({ scroll = false } = {}) {
     });
   });
 
-  if (focusId) {
+  container.querySelectorAll('.fx-chip').forEach(chip => {
+    chip.addEventListener('click', () => { fixturesDay = chip.dataset.day; renderFixturesView(); });
+  });
+
+  if (focusId && selectedKey === focusKey) {
     container.querySelector(`#fx-match-${focusId}`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }

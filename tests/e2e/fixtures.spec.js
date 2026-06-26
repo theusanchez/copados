@@ -19,7 +19,7 @@ test('empty schedule shows a friendly placeholder', async ({ page }) => {
   await expect(page.locator('#view-fixtures')).toContainText('calendário aparece aqui');
 });
 
-test('matches are listed chronologically with day buckets and a lock countdown', async ({ page }) => {
+test('matches are split into per-day chips, sorted, with a lock countdown', async ({ page }) => {
   const now = Date.now();
   await boot(page, {
     currentUser: user('me', 'Eu'),
@@ -34,15 +34,19 @@ test('matches are listed chronologically with day buckets and a lock countdown',
   });
   await openFixtures(page);
 
-  const cards = page.locator('#view-fixtures .fx-card');
-  await expect(cards).toHaveCount(3);
-  // First card should be the soonest (A1), not the seed order.
-  await expect(cards.nth(0)).toHaveAttribute('id', 'fx-match-A1');
-  await expect(cards.nth(2)).toHaveAttribute('id', 'fx-match-A2');
+  // A1/B1 are soon, A2 is a day later → at least two day chips (list shows one day).
+  expect(await page.locator('.fx-chip').count()).toBeGreaterThanOrEqual(2);
 
-  await expect(page.locator('#view-fixtures')).toContainText('Hoje');
-  await expect(page.locator('#view-fixtures')).toContainText('Amanhã');
+  // Focus lands on the soonest match's day; A1 (soonest) is the first card and carries
+  // the lock countdown. A2, on a later day, isn't in the focused day's list.
+  const cards = page.locator('#view-fixtures .fx-card');
+  await expect(cards.nth(0)).toHaveAttribute('id', 'fx-match-A1');
   await expect(page.locator('#fx-match-A1 .fx-countdown')).toContainText('trava em');
+  await expect(page.locator('#fx-match-A2')).toHaveCount(0);
+
+  // The last chip (latest day) reveals A2.
+  await page.locator('.fx-chip').last().click();
+  await expect(page.locator('#fx-match-A2')).toBeVisible();
 });
 
 test('saving a score in the fixtures view syncs to the groups view', async ({ page }) => {
@@ -87,7 +91,8 @@ test('opening Jogos focuses the next match to start (skipping finished ones)', a
 
   await expect(page.locator('#fx-match-B1')).toHaveClass(/\bfx-focus\b/);
   await expect(page.locator('#fx-match-A1')).not.toHaveClass(/\bfx-focus\b/);
-  await expect(page.locator('#fx-match-A2')).not.toHaveClass(/\bfx-focus\b/);
+  // A2 is on a later day, so it isn't in the focused day's list at all.
+  await expect(page.locator('#fx-match-A2')).toHaveCount(0);
 });
 
 test('opening Jogos focuses the live match when one is in play', async ({ page }) => {
