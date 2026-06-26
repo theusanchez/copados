@@ -4,6 +4,15 @@
 export function createFakeBackend() {
   let seed = {};
   try { seed = JSON.parse(localStorage.getItem('e2e_seed') || '{}'); } catch { seed = {}; }
+  // `?demo=1` (with no explicit e2e_seed) populates sample data — 6 players, finished
+  // + live + upcoming matches, two leagues — so the redesign can be explored populated,
+  // without Firebase. Used for local/phone visual testing, never by the E2E suite.
+  try {
+    if (new URLSearchParams(location.search).has('demo') && !seed.currentUser) {
+      seed = demoSeed();
+      localStorage.setItem('feature_liveScores', 'true');
+    }
+  } catch { /* no location */ }
 
   const state = {
     currentUser: seed.currentUser || null,
@@ -140,5 +149,60 @@ export function createFakeBackend() {
     async loadUserLeagues(uid) {
       return structuredClone(state.leagues.filter(l => l.memberUids.includes(uid)));
     },
+  };
+}
+
+// Sample data for ?demo=1 — deterministic so screenshots are stable. IDs follow the
+// known match-id scheme (A1..L6, R32_xx, R16_xx, QF_xx, SF_0x, THIRD, FINAL) so this
+// stays decoupled from data.js.
+function demoSeed() {
+  const groupIds = [];
+  'ABCDEFGHIJKL'.split('').forEach(g => { for (let i = 1; i <= 6; i++) groupIds.push(g + i); });
+  const koIds = [];
+  for (let i = 1; i <= 16; i++) koIds.push('R32_' + String(i).padStart(2, '0'));
+  for (let i = 1; i <= 8; i++) koIds.push('R16_' + String(i).padStart(2, '0'));
+  for (let i = 1; i <= 4; i++) koIds.push('QF_' + String(i).padStart(2, '0'));
+  koIds.push('SF_01', 'SF_02', 'THIRD', 'FINAL');
+  const allIds = groupIds.concat(koIds);
+
+  const players = [
+    { uid: 'me', displayName: 'Você', off: 0 },
+    { uid: 'lucas', displayName: 'Lucas Figueiredo', off: 0 },
+    { uid: 'vitor', displayName: 'Vitor Ramos', off: 1 },
+    { uid: 'clarice', displayName: 'Clarice Grossi', off: 2 },
+    { uid: 'pedro', displayName: 'Pedro Costa', off: 3 },
+    { uid: 'rayssa', displayName: 'Rayssa Araújo', off: 4 },
+  ];
+  const base = i => ({ home: i % 3, away: (i + 1) % 2 });
+  const predictions = {};
+  players.forEach(p => {
+    const m = {};
+    allIds.forEach((id, i) => {
+      const b = base(i);
+      m[id] = p.uid === 'lucas'
+        ? b // the leader nails every result
+        : { home: Math.max(0, b.home + ((i + p.off) % 2)), away: Math.max(0, b.away + ((i + p.off + 1) % 2)) };
+    });
+    predictions[p.uid] = m;
+  });
+
+  const now = Date.now(), H = 3600e3;
+  const results = {};
+  groupIds.filter(id => +id.slice(1) <= 4).forEach((id, i) => {
+    const b = base(i);
+    results[id] = { status: 'finished', home: b.home, away: b.away, kickoff: now - (60 - i) * H };
+  });
+  results.B2 = { status: 'live', home: 1, away: 0, homeTeam: 'Catar', awayTeam: 'Suíça', kickoff: now - 0.5 * H };
+  ['A5', 'A6', 'C5', 'C6'].forEach((id, i) => { results[id] = { status: 'scheduled', kickoff: now + (3 + i * 2) * H }; });
+
+  return {
+    currentUser: { uid: 'me', displayName: 'Você', email: 'voce@demo.app', photoURL: null, isAnonymous: false },
+    users: players.map(p => ({ uid: p.uid, displayName: p.displayName, photoURL: null })),
+    predictions,
+    results,
+    leagues: [
+      { id: 'firma', name: 'Bolão da Firma', code: 'FIRMA26', ownerUid: 'lucas', memberUids: players.map(p => p.uid) },
+      { id: 'amigos', name: 'Amigos da Pelada', code: 'PELADA', ownerUid: 'me', memberUids: ['me', 'vitor', 'pedro'] },
+    ],
   };
 }

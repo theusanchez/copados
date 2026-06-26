@@ -60,6 +60,8 @@ test('a scheduled match shows kickoff time, not a live badge', async ({ page }) 
     },
   });
 
+  // A scheduled (still editable) group match renders as a stepper card; its kickoff
+  // shows in the card's top row (.gp-when), not a locked card's .match-kickoff.
   await expect(page.locator('#match-A1 .match-live')).toHaveCount(0);
-  await expect(page.locator('#match-A1 .match-kickoff')).toBeVisible();
+  await expect(page.locator('#match-A1 .gp-when')).toBeVisible();
 });

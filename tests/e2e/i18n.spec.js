@@ -23,7 +23,9 @@ test('lang=en translates the interface', async ({ page }) => {
 
 test('the EN switcher persists across reloads', async ({ page }) => {
   await boot(page, me());
-  await page.locator('#view-app .lang-btn[data-lang="en"]').click(); // triggers reload
+  // The language switcher lives in the account menu (behind the avatar) now.
+  await page.locator('#btn-user').click();
+  await page.locator('#user-menu .lang-btn[data-lang="en"]').click(); // triggers reload
   await expect(page.locator('.nav-tab[data-view="groups"]')).toContainText('Groups');
   expect(await page.evaluate(() => localStorage.getItem('lang'))).toBe('en');
 });

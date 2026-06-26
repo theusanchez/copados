@@ -10,7 +10,7 @@ test('group match shows its assigned stadium, city, state and country', async ({
   });
 
   // A1 → Group A → Estadio Azteca (Cidade do México).
-  await expect(page.locator('#match-A1 .match-kickoff'))
+  await expect(page.locator('#match-A1 .gp-venue'))
     .toContainText('Estadio Azteca · Cidade do México, CDMX (México)');
 
   await page.locator('.nav-tab[data-view="fixtures"]').click();
@@ -38,9 +38,9 @@ test('real per-fixture venues (matched by team pair, not by group)', async ({ pa
     results: {},
   });
   // Same group, different venues — proves it is the official per-match assignment.
-  await expect(page.locator('#match-C1 .match-kickoff')).toContainText('MetLife Stadium');        // Brasil x Marrocos
-  await expect(page.locator('#match-C6 .match-kickoff')).toContainText('Mercedes-Benz Stadium');  // Marrocos x Haiti
-  await expect(page.locator('#match-F2 .match-kickoff')).toContainText('Estadio BBVA');            // Suécia x Tunísia
+  await expect(page.locator('#match-C1 .gp-venue')).toContainText('MetLife Stadium');        // Brasil x Marrocos
+  await expect(page.locator('#match-C6 .gp-venue')).toContainText('Mercedes-Benz Stadium');  // Marrocos x Haiti
+  await expect(page.locator('#match-F2 .gp-venue')).toContainText('Estadio BBVA');            // Suécia x Tunísia
 });
 
 test('final and third place use the real fixed venues; other KO rounds show none', async ({ page }) => {

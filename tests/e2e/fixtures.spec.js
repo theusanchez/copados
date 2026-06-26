@@ -62,8 +62,8 @@ test('saving a score in the fixtures view syncs to the groups view', async ({ pa
   await away.fill('1');
   await away.blur();
 
-  // Progress reflects it immediately.
-  await expect(page.locator('#progress-tracker')).toContainText('Grupos 1/72');
+  // Progress reflects it immediately (header chip aria-label carries the detail).
+  await expect(page.locator('#progress-chip')).toHaveAttribute('aria-label', /Grupos 1\/72/);
 
   // The groups view shows the same value (inputs kept in sync across views).
   await page.locator('.nav-tab[data-view="groups"]').click();

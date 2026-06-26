@@ -41,15 +41,16 @@ const DICT = {
     'header.lang': 'Idioma',
 
     // --- login ---
-    'login.subtitle': 'Faça seus palpites para a Copa do Mundo FIFA 2026 e compete com seus amigos.',
-    'login.google': 'Entrar com Google',
-    'login.divider': 'ou com e-mail',
+    'login.subtitle': 'O bolão da Copa do Mundo com a sua turma. 104 jogos, um só campeão.',
+    'login.google': 'Continuar com Google',
+    'login.divider': 'OU',
     'login.name': 'Seu nome',
     'login.email': 'E-mail',
     'login.password': 'Senha (mín. 6 caracteres)',
     'login.submit': 'Entrar / Criar conta',
     'login.magic': 'Receber link de acesso por e-mail',
     'login.guest': 'Entrar como convidado',
+    'login.legal': 'Ao entrar, você concorda com os termos de uso',
 
     // --- auth errors ---
     'err.auth/email-already-in-use': 'Este e-mail já tem conta — confira a senha e tente entrar.',
@@ -86,6 +87,8 @@ const DICT = {
 
     // --- groups / standings ---
     'groups.matchday': 'Rodada {n}',
+    'groups.autosaved': 'Salvo automaticamente',
+    'groups.yourPicks': 'Seus palpites',
     'standings.aria': 'Classificação Grupo {group}',
     'standings.team': 'Seleção',
     'std.played': 'PJ', 'std.playedT': 'Jogos',
@@ -96,7 +99,7 @@ const DICT = {
 
     // --- knockout ---
     'ko.locked': '🔒 Complete a <strong>fase de grupos</strong> para preencher o mata-mata. Por enquanto você pode acompanhar como o chaveamento está ficando.',
-    'ko.hint': 'Arraste para o lado para ver todas as fases →',
+    'ko.hint': 'Toque numa fase para ver os confrontos.',
     'round.r32': 'Rodada de 32',
     'round.r16': 'Oitavas de Final',
     'round.qf': 'Quartas de Final',
@@ -245,15 +248,16 @@ const DICT = {
     'header.theme': 'Choose theme',
     'header.lang': 'Language',
 
-    'login.subtitle': 'Predict every FIFA World Cup 2026 result and compete with your friends.',
-    'login.google': 'Sign in with Google',
-    'login.divider': 'or with e-mail',
+    'login.subtitle': 'The World Cup pool with your crew. 104 matches, one champion.',
+    'login.google': 'Continue with Google',
+    'login.divider': 'OR',
     'login.name': 'Your name',
     'login.email': 'E-mail',
     'login.password': 'Password (min. 6 characters)',
     'login.submit': 'Sign in / Sign up',
     'login.magic': 'Get a sign-in link by e-mail',
     'login.guest': 'Continue as guest',
+    'login.legal': 'By continuing, you agree to the terms of use',
 
     'err.auth/email-already-in-use': 'This e-mail already has an account — check the password and sign in.',
     'err.auth/invalid-email': 'Invalid e-mail.',
@@ -285,6 +289,8 @@ const DICT = {
     'guest.fill': 'Fill in e-mail and password.',
 
     'groups.matchday': 'Matchday {n}',
+    'groups.autosaved': 'Saved automatically',
+    'groups.yourPicks': 'Your picks',
     'standings.aria': 'Group {group} standings',
     'standings.team': 'Team',
     'std.played': 'P', 'std.playedT': 'Played',
@@ -294,7 +300,7 @@ const DICT = {
     'std.q1': 'Qualified (1st)', 'std.q2': 'Qualified (2nd)', 'std.q3': 'Best 3rd',
 
     'ko.locked': '🔒 Finish the <strong>group stage</strong> to fill in the knockout. For now you can watch the bracket take shape.',
-    'ko.hint': 'Swipe sideways to see every round →',
+    'ko.hint': 'Tap a round to see its matchups.',
     'round.r32': 'Round of 32',
     'round.r16': 'Round of 16',
     'round.qf': 'Quarter-finals',

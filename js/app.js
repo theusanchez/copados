@@ -175,25 +175,22 @@ function countFilled(preds) {
   };
 }
 
+// Header progress chip: a compact "✓ N" of completed predictions. The full inline
+// tracker is retired in favour of this always-visible chip in the chrome.
 function renderProgress() {
-  const el = document.getElementById('progress-tracker');
-  if (!el) return;
+  const chip = document.getElementById('progress-chip');
+  if (!chip) return;
   const c = countFilled(predictions);
   const done = c.group + c.ko;
   const total = c.groupTotal + c.koTotal;
-  const pct = total ? Math.round((done / total) * 100) : 0;
   const complete = done === total;
-  el.classList.remove('hidden');
-  el.classList.toggle('complete', complete);
-  el.innerHTML = complete
-    ? `<div class="progress-row"><span class="progress-msg">${t('progress.complete')}</span></div>`
-    : `<div class="progress-row">
-        <span class="progress-msg">${t('progress.remaining', { done: total - done, total })}</span>
-        <span class="progress-detail">${t('progress.detail', { group: c.group, groupTotal: c.groupTotal, ko: c.ko, koTotal: c.koTotal })}</span>
-      </div>
-      <div class="progress-track" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
-        <div class="progress-fill" style="width:${pct}%"></div>
-      </div>`;
+  chip.classList.remove('hidden');
+  chip.classList.toggle('complete', complete);
+  chip.setAttribute('aria-label', complete
+    ? t('progress.complete')
+    : `${done}/${total} — ${t('progress.detail', { group: c.group, groupTotal: c.groupTotal, ko: c.ko, koTotal: c.koTotal })}`);
+  chip.innerHTML = `<svg class="progress-chip-check" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span>${done}</span>`;
+  document.getElementById('progress-tracker')?.classList.add('hidden');
 }
 
 function recomputeAll() {
@@ -367,31 +364,59 @@ document.getElementById('btn-logout').addEventListener('click', () => {
 // -----------------------------------------------------------------------
 // Theme picker
 // -----------------------------------------------------------------------
-// The saved theme is applied before paint by an inline script in index.html;
-// here we keep the PWA status-bar color and the swatch "pressed" state in sync,
-// and persist changes. Theme = device preference (localStorage), no Firestore.
-const THEME_COLORS = {
-  classico: '#0d1117',
-  copa: '#0a1a10',
-  sunset: '#2b0f47',
-  neon: '#0b0f1f',
-  claro: '#ffffff',
+// Two themes: dark (default, no data-theme attribute) and light. The boot script
+// in index.html applies the saved theme before paint; here we keep the PWA status-bar
+// color and the toggle icon in sync, and persist changes (device preference, not
+// Firestore). The accent split (--acc fills / --accink text) lives in css/style.css.
+const THEME_COLORS = { dark: '#0a0c0b', light: '#f3f5ef' };
+
+// dark active -> moon (tap = go light); light active -> sun (tap = go dark)
+const THEME_ICON = {
+  moon: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>',
+  sun: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
 };
 
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  try { localStorage.setItem('theme', theme); } catch { /* private mode */ }
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta && THEME_COLORS[theme]) meta.content = THEME_COLORS[theme];
-  document.querySelectorAll('.theme-swatch').forEach(b =>
-    b.setAttribute('aria-pressed', String(b.dataset.themeValue === theme)));
+function currentTheme() {
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 }
 
-document.querySelectorAll('.theme-swatch').forEach(btn =>
-  btn.addEventListener('click', () => applyTheme(btn.dataset.themeValue)));
+function applyTheme(theme) {
+  const v = theme === 'light' ? 'light' : 'dark';
+  if (v === 'light') document.documentElement.dataset.theme = 'light';
+  else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem('theme', v); } catch { /* private mode */ }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = THEME_COLORS[v];
+  const btn = document.getElementById('btn-theme');
+  if (btn) {
+    btn.innerHTML = v === 'light' ? THEME_ICON.sun : THEME_ICON.moon;
+    btn.setAttribute('aria-pressed', String(v === 'light'));
+  }
+}
 
-// Sync status-bar color + pressed state with whatever the boot script applied.
-applyTheme(document.documentElement.dataset.theme || 'classico');
+document.getElementById('btn-theme')?.addEventListener('click', () =>
+  applyTheme(currentTheme() === 'light' ? 'dark' : 'light'));
+
+// Sync status-bar color + toggle icon with whatever the boot script applied.
+applyTheme(currentTheme());
+
+// Account menu (avatar): toggle on tap, dismiss on outside click / Escape.
+const userBtn = document.getElementById('btn-user');
+const userMenu = document.getElementById('user-menu');
+function closeUserMenu() {
+  userMenu?.classList.add('hidden');
+  userBtn?.setAttribute('aria-expanded', 'false');
+}
+userBtn?.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = !userMenu.classList.toggle('hidden');
+  userBtn.setAttribute('aria-expanded', String(open));
+});
+document.addEventListener('click', e => {
+  if (userMenu && !userMenu.classList.contains('hidden') &&
+      !userMenu.contains(e.target) && !userBtn.contains(e.target)) closeUserMenu();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUserMenu(); });
 
 // -----------------------------------------------------------------------
 // Language
@@ -529,10 +554,15 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
 function renderUserInfo() {
   if (!currentUser) return;
   const el = document.getElementById('user-info');
-  const photo = currentUser.photoURL
-    ? `<img src="${escapeHtml(currentUser.photoURL)}" alt="${escapeHtml(currentUser.displayName)}" class="avatar" referrerpolicy="no-referrer" onerror="this.remove()">`
-    : '';
-  el.innerHTML = `${photo}<span class="user-name">${escapeHtml(currentUser.displayName)}</span>`;
+  if (el) {
+    // Avatar for sight; the name stays as visually-hidden text so the account button
+    // has an accessible name (and so views/tests can read who is signed in).
+    el.innerHTML = avatarHtml(currentUser, 'avatar') +
+      `<span class="sr-only">${escapeHtml(currentUser.displayName)}</span>`;
+    attachAvatarFallback(el);
+  }
+  const nameEl = document.getElementById('user-menu-name');
+  if (nameEl) nameEl.textContent = currentUser.displayName || '';
 }
 
 // -----------------------------------------------------------------------
@@ -731,10 +761,11 @@ function renderGroupsView() {
 
   const panelsHtml = groupKeys.map((g, i) =>
     `<div class="group-panel${i === 0 ? '' : ' hidden'}" id="group-panel-${g}">
-      ${renderGroupMatches(g)}
       <div class="standings-container" id="standings-${g}">
         ${renderStandingsTable(g)}
       </div>
+      <h3 class="matchday-label gp-preds-label">${t('groups.yourPicks')}</h3>
+      ${renderGroupMatches(g)}
     </div>`
   ).join('');
 
@@ -769,6 +800,20 @@ function renderGroupsView() {
       if (groupKey) renderGroupStandings(groupKey);
     });
   });
+
+  // Stepper buttons (▲/▼): nudge the matching score input, clamp 0–20, then save
+  // (which also recomputes the live standings + syncs the value across views).
+  container.querySelectorAll('.gp-step-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { matchId, side } = btn.dataset;
+      const input = container.querySelector(`.score-input[data-match-id="${matchId}"][data-side="${side}"]`);
+      if (!input || input.readOnly) return;
+      const cur = input.value === '' ? 0 : Number(input.value);
+      const next = Math.max(0, Math.min(20, cur + (btn.classList.contains('gp-up') ? 1 : -1)));
+      input.value = String(next);
+      savePrediction(matchId, side, String(next));
+    });
+  });
 }
 
 function renderGroupMatches(groupKey) {
@@ -779,10 +824,59 @@ function renderGroupMatches(groupKey) {
     return `
       <div class="matchday">
         <h3 class="matchday-label">${t('groups.matchday', { n: md })}</h3>
-        ${matches.map(m => renderMatchCard(m, false)).join('')}
+        ${matches.map(m => renderGroupCard(m)).join('')}
       </div>
     `;
   }).join('');
+}
+
+// Group-stage prediction card: a stepper (▲/▼ + score box) per side, with the real
+// <input class="score-input"> kept as the source of truth so the existing save +
+// live-standings-recompute + cross-view sync all keep working untouched. Once a match
+// locks (kicked off / finished) it falls back to the read-only result card.
+function renderGroupCard(match) {
+  if (isMatchLocked(match.id)) return renderMatchCard(match, false);
+  const pred = predictions[match.id] || {};
+  const hVal = pred.home != null ? pred.home : '';
+  const aVal = pred.away != null ? pred.away : '';
+  const home = match.home, away = match.away;
+  const kickoff = formatKickoff(results[match.id]?.kickoff);
+  const venue = venueLabel(match.id);
+  const CHEV_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 15l-6-6-6 6"/></svg>';
+  const CHEV_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  const stepper = (side, val, team) => `
+    <div class="gp-step">
+      <button class="gp-step-btn gp-up" type="button" data-match-id="${match.id}" data-side="${side}" aria-label="${tTeam(team)} +1">${CHEV_UP}</button>
+      <input class="score-input gp-box" type="number" min="0" max="20" inputmode="numeric"
+        data-match-id="${match.id}" data-side="${side}" value="${val}"
+        aria-label="${t('aria.score', { team: tTeam(team) })}">
+      <button class="gp-step-btn gp-down" type="button" data-match-id="${match.id}" data-side="${side}" aria-label="${tTeam(team)} -1">${CHEV_DOWN}</button>
+    </div>`;
+  const teamCol = team => `
+    <div class="gp-team">
+      <span class="team-flag">${flag(team)}</span>
+      <span class="gp-team-name">${tTeam(team)}</span>
+    </div>`;
+  return `
+    <div class="gp-card" id="match-${match.id}">
+      <div class="gp-card-top">
+        <span class="gp-when">${kickoff || ''}</span>
+        ${venue ? `<span class="gp-venue">${venue}</span>` : ''}
+      </div>
+      <div class="gp-body">
+        ${teamCol(home)}
+        <div class="gp-stepper">
+          ${stepper('home', hVal, home)}
+          <span class="gp-x">×</span>
+          ${stepper('away', aVal, away)}
+        </div>
+        ${teamCol(away)}
+      </div>
+      <div class="gp-saved">
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+        <span>${t('groups.autosaved')}</span>
+      </div>
+    </div>`;
 }
 
 function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
@@ -974,16 +1068,17 @@ function renderKnockoutView() {
   const container = document.getElementById('view-knockout');
   currentUserKo = resolveKnockout(predictions);
   koFillLocked = !groupStageReady(predictions);
-  const rounds = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
+  // Mobile-first: a chip selector picks one round at a time, shown as a vertical list
+  // of matchup cards (instead of a cramped horizontal bracket on a phone).
+  const rounds = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
 
-  // The main bracket is the tree r32 → r16 → qf → sf → final, laid out as
-  // horizontally-scrollable columns (each column's nodes spread with space-around so
-  // they align against their feeders in the previous column). Third place is a
-  // consolation match, shown separately below the tree.
-  const treeRounds = ['r32', 'r16', 'qf', 'sf', 'final'];
-  const colsHtml = treeRounds.map(r =>
-    `<div class="ko-col" data-round="${r}">
-       <div class="ko-col-head">${t('round.' + r)}</div>
+  const chipsHtml = rounds.map((r, i) =>
+    `<button class="ko-chip${i === 0 ? ' active' : ''}" type="button" data-round="${r}">${t('round.' + r)}</button>`
+  ).join('');
+
+  const panelsHtml = rounds.map((r, i) =>
+    `<div class="ko-round-panel${i === 0 ? '' : ' hidden'}" id="ko-panel-${r}">
+       <h3 class="matchday-label">${t('round.' + r)}</h3>
        <div class="ko-col-body" id="ko-col-${r}"></div>
      </div>`
   ).join('');
@@ -992,18 +1087,24 @@ function renderKnockoutView() {
     ? `<div class="ko-locked-notice">${t('ko.locked')}</div>` : '';
 
   container.innerHTML = `
+    <div class="compare-header"><h2>${t('nav.knockout')}</h2></div>
+    <div class="ko-chips">${chipsHtml}</div>
     ${lockNotice}
     <div class="ko-hint">${t('ko.hint')}</div>
-    <div class="ko-bracket-scroll">
-      <div class="ko-bracket">${colsHtml}</div>
-    </div>
-    <div class="ko-third">
-      <div class="ko-col-head ko-third-head">${t('round.third')}</div>
-      <div class="ko-col-body" id="ko-col-third"></div>
-    </div>
+    <div class="ko-rounds">${panelsHtml}</div>
   `;
 
   rounds.forEach(r => renderKnockoutRound(r));
+
+  // Round chip switching (same pattern as the group selector).
+  container.querySelectorAll('.ko-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      container.querySelectorAll('.ko-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      container.querySelectorAll('.ko-round-panel').forEach(p => p.classList.add('hidden'));
+      container.querySelector(`#ko-panel-${chip.dataset.round}`)?.classList.remove('hidden');
+    });
+  });
 }
 
 function renderKnockoutRound(round) {
