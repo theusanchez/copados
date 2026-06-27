@@ -1359,6 +1359,16 @@ function renderFixturesView({ scroll = false } = {}) {
     chip.addEventListener('click', () => { fixturesDay = chip.dataset.day; renderFixturesView(); });
   });
 
+  // Keep the active day chip centred in the horizontal strip (it's often far from the
+  // start of the calendar, e.g. "today" mid-tournament).
+  const activeChip = container.querySelector('.fx-chip.active');
+  const daysRow = container.querySelector('.fx-days');
+  if (activeChip && daysRow) {
+    const cRect = daysRow.getBoundingClientRect();
+    const aRect = activeChip.getBoundingClientRect();
+    daysRow.scrollLeft += (aRect.left - cRect.left) - (cRect.width - aRect.width) / 2;
+  }
+
   if (focusId && selectedKey === focusKey) {
     container.querySelector(`#fx-match-${focusId}`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
