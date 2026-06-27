@@ -1317,15 +1317,22 @@ function renderFixturesView({ scroll = false } = {}) {
     b.items.push(it);
   });
 
-  // Visible day: the saved choice if still present, else the day of the current/next
-  // match, else the first day with an unplayed match, else the last day.
-  const focusKey = focusId ? dayKey(items.find(i => i.match.id === focusId).ms) : null;
-  const firstLiveKey = buckets.find(b => b.items.some(i => results[i.match.id]?.status !== 'finished'))?.key;
-  const selectedKey = (fixturesDay && buckets.some(b => b.key === fixturesDay))
+  // Default day = today if it has matches, else the nearest upcoming day, else the
+  // most recent past day. (dayKey is 'YYYY-MM-DD' → lexicographic = chronological.)
+  const todayKey = dayKey(Date.now());
+  const defaultKey = buckets.some(b => b.key === todayKey)
+    ? todayKey
+    : (buckets.find(b => b.key >= todayKey) || buckets[buckets.length - 1]).key;
+
+  // Opening the tab (scroll) always lands on today; while you stay in the view your
+  // chip choice sticks across live re-renders.
+  const selectedKey = (!scroll && fixturesDay && buckets.some(b => b.key === fixturesDay))
     ? fixturesDay
-    : (focusKey || firstLiveKey || buckets[buckets.length - 1].key);
+    : defaultKey;
   fixturesDay = selectedKey;
   const selected = buckets.find(b => b.key === selectedKey) || buckets[0];
+
+  const focusKey = focusId ? dayKey(items.find(i => i.match.id === focusId).ms) : null;
 
   const chipsHtml = buckets.map(b => `
     <button class="fx-chip${b.key === selectedKey ? ' active' : ''}" type="button" data-day="${b.key}" aria-pressed="${b.key === selectedKey}">

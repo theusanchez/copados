@@ -75,6 +75,27 @@ test('saving a score in the fixtures view syncs to the groups view', async ({ pa
     .toHaveValue('3');
 });
 
+test('opening Jogos lands on today, even with a stale unfinished match on an earlier day', async ({ page }) => {
+  const now = Date.now();
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [user('me', 'Eu')],
+    predictions: {},
+    results: {
+      // A past match the ingester never marked 'finished' — must NOT drag the view back.
+      A1: { status: 'scheduled', homeTeam: 'México', awayTeam: 'África do Sul', kickoff: now - 2 * DAY },
+      B1: { status: 'scheduled', homeTeam: 'Canadá', awayTeam: 'Bósnia e Herzegovina', kickoff: now + 2 * HOUR },
+      A2: { status: 'scheduled', homeTeam: 'Coreia do Sul', awayTeam: 'República Tcheca', kickoff: now + 1 * DAY },
+    },
+  });
+  await openFixtures(page);
+
+  // Defaults to today's chip and today's match — not the earliest day in the list.
+  await expect(page.locator('.fx-chip.active .fx-chip-top')).toContainText('Hoje');
+  await expect(page.locator('#fx-match-B1')).toBeVisible();
+  await expect(page.locator('#fx-match-A1')).toHaveCount(0);
+});
+
 test('opening Jogos focuses the next match to start (skipping finished ones)', async ({ page }) => {
   const now = Date.now();
   await boot(page, {
