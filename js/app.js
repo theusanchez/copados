@@ -20,6 +20,8 @@ let unsubscribeResults = null; // active Firestore results listener, if any
 let fixturesScrollPending = false; // login opened Jogos before results loaded; scroll once they arrive
 let rankingRound = 'overall'; // ranking view scope: 'overall' or a RANKING_ROUNDS index
 let fixturesDay = null;        // selected day (matchday key) in the Jogos view; null = auto
+let groupsOfficial = false;    // Grupos view: false = my picks, true = official results
+let groupsActiveTab = null;    // active group tab in the Grupos view (preserved across re-render)
 
 const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
 
@@ -766,37 +768,61 @@ function renderGroupsView() {
   currentUserKo = resolveKnockout(predictions);
   // Group tabs
   const groupKeys = Object.keys(GROUPS);
+  if (!groupKeys.includes(groupsActiveTab)) groupsActiveTab = groupKeys[0];
 
-  const tabsHtml = groupKeys.map((g, i) =>
-    `<button class="group-tab${i === 0 ? ' active' : ''}" data-group="${g}">${g}</button>`
+  const tabsHtml = groupKeys.map(g =>
+    `<button class="group-tab${g === groupsActiveTab ? ' active' : ''}" data-group="${g}">${g}</button>`
   ).join('');
 
-  const panelsHtml = groupKeys.map((g, i) =>
-    `<div class="group-panel${i === 0 ? '' : ' hidden'}" id="group-panel-${g}">
+  const official = groupsOfficial;
+  const headLabel = official ? t('groups.officialResults') : t('groups.yourPicks');
+  const panelsHtml = groupKeys.map(g =>
+    `<div class="group-panel${g === groupsActiveTab ? '' : ' hidden'}" id="group-panel-${g}">
       <div class="standings-container" id="standings-${g}">
-        ${renderStandingsTable(g)}
+        ${renderStandingsTable(g, official)}
       </div>
-      <h3 class="matchday-label gp-preds-label">${t('groups.yourPicks')}</h3>
-      ${renderGroupMatches(g)}
+      <h3 class="matchday-label gp-preds-label">${headLabel}</h3>
+      ${renderGroupMatches(g, official)}
     </div>`
   ).join('');
+
+  const toggleHtml = `
+    <div class="gp-view-toggle" role="group" aria-label="${t('groups.viewPicks')} / ${t('groups.viewOfficial')}">
+      <button class="gp-view-btn${official ? '' : ' active'}" data-official="0" aria-pressed="${!official}">${t('groups.viewPicks')}</button>
+      <button class="gp-view-btn${official ? ' active' : ''}" data-official="1" aria-pressed="${official}">${t('groups.viewOfficial')}</button>
+    </div>`;
 
   container.innerHTML = `
     <div class="group-tabs-wrapper">
       <div class="group-tabs">${tabsHtml}</div>
     </div>
+    ${toggleHtml}
     <div class="group-panels">${panelsHtml}</div>
   `;
+
+  // My picks / Official toggle
+  container.querySelectorAll('.gp-view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const next = btn.dataset.official === '1';
+      if (next === groupsOfficial) return;
+      groupsOfficial = next;
+      renderGroupsView();
+    });
+  });
 
   // Tab switching
   container.querySelectorAll('.group-tab').forEach(tab => {
     tab.addEventListener('click', () => {
+      groupsActiveTab = tab.dataset.group;
       container.querySelectorAll('.group-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       container.querySelectorAll('.group-panel').forEach(p => p.classList.add('hidden'));
       container.querySelector(`#group-panel-${tab.dataset.group}`).classList.remove('hidden');
     });
   });
+
+  // Official view is read-only — no inputs/steppers to wire up.
+  if (official) return;
 
   // Input listeners
   container.querySelectorAll('.score-input').forEach(input => {
@@ -828,7 +854,7 @@ function renderGroupsView() {
   });
 }
 
-function renderGroupMatches(groupKey) {
+function renderGroupMatches(groupKey, official) {
   const group = GROUPS[groupKey];
   const matchdays = [1, 2, 3];
   return matchdays.map(md => {
@@ -836,10 +862,44 @@ function renderGroupMatches(groupKey) {
     return `
       <div class="matchday">
         <h3 class="matchday-label">${t('groups.matchday', { n: md })}</h3>
-        ${matches.map(m => renderGroupCard(m)).join('')}
+        ${matches.map(m => official ? renderOfficialCard(m) : renderGroupCard(m)).join('')}
       </div>
     `;
   }).join('');
+}
+
+// Official-results card: the real scoreline for a group match, read-only. Reuses the
+// stepper card frame but swaps the editable boxes for static numbers. Unplayed matches
+// show a dash and the kickoff.
+function renderOfficialCard(match) {
+  const r = results[match.id];
+  const finished = r && r.status === 'finished' && r.home != null && r.away != null;
+  const home = match.home, away = match.away;
+  const kickoff = formatKickoff(r?.kickoff);
+  const venue = venueLabel(match.id);
+  const box = val => `<div class="gp-box gp-static">${finished ? val : '–'}</div>`;
+  const teamCol = team => `
+    <div class="gp-team">
+      <span class="team-flag">${flag(team)}</span>
+      <span class="gp-team-name">${tTeam(team)}</span>
+    </div>`;
+  return `
+    <div class="gp-card gp-official" id="match-${match.id}">
+      <div class="gp-card-top">
+        <span class="gp-when">${kickoff || ''}</span>
+        ${venue ? `<span class="gp-venue">${venue}</span>` : ''}
+      </div>
+      <div class="gp-body">
+        ${teamCol(home)}
+        <div class="gp-stepper">
+          ${box(r?.home)}
+          <span class="gp-x">×</span>
+          ${box(r?.away)}
+        </div>
+        ${teamCol(away)}
+      </div>
+      ${finished ? '' : `<div class="gp-saved"><span>${t('groups.notPlayed')}</span></div>`}
+    </div>`;
 }
 
 // Group-stage prediction card: a stepper (▲/▼ + score box) per side, with the real
@@ -1016,10 +1076,11 @@ function renderGroupStandings(groupKey) {
   if (el) el.innerHTML = renderStandingsTable(groupKey);
 }
 
-function renderStandingsTable(groupKey) {
-  // Collect live values from inputs if they exist
-  const livePreds = collectLivePreds(groupKey);
-  const merged = { ...predictions, ...livePreds };
+function renderStandingsTable(groupKey, official) {
+  // Official table reads the real results; the picks table merges live input values.
+  const merged = official
+    ? officialGroupPreds()
+    : { ...predictions, ...collectLivePreds(groupKey) };
   const standings = groupStandings(groupKey, merged);
   const { bestThirds } = computeAdvancing(merged);
   const bestThirdTeams = new Set(bestThirds.map(t => t.team));
@@ -1059,6 +1120,18 @@ function renderStandingsTable(groupKey) {
       <span class="legend-dot rank-2nd-dot"></span> ${t('std.q2')}
       <span class="legend-dot rank-3rd-dot"></span> ${t('std.q3')}
     </div>`;
+}
+
+// Build a { matchId: {home, away} } map from the real results (finished matches only),
+// shaped like predictions so groupStandings / computeAdvancing can score the real table.
+function officialGroupPreds() {
+  const out = {};
+  Object.entries(results).forEach(([id, r]) => {
+    if (r && r.status === 'finished' && r.home != null && r.away != null) {
+      out[id] = { home: r.home, away: r.away };
+    }
+  });
+  return out;
 }
 
 function collectLivePreds(groupKey) {

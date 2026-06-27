@@ -4142,6 +4142,54 @@ body {
   letter-spacing: 0.3px;
 }
 
+/* My picks / Official segmented toggle */
+.gp-view-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: var(--space-4);
+  background: var(--elev);
+  border: 1px solid var(--bd2);
+  border-radius: 12px;
+}
+.gp-view-btn {
+  flex: 1 1 0;
+  padding: 8px 0;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--sub);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.2px;
+  transition: var(--transition);
+}
+.gp-view-btn.active {
+  background: var(--acc);
+  color: var(--onacc);
+}
+
+/* Read-only official scoreline box (mirrors the .gp-box stepper input) */
+.gp-box.gp-static {
+  width: 46px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--box);
+  border: 1px solid var(--bd2);
+  color: var(--box-num);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gp-official .gp-saved {
+  margin-top: 13px;
+  color: var(--sub2);
+}
+
 /* ================================================================
    MATCHDAY — Chave (knockout): round chips + per-round card list
    ================================================================ */
