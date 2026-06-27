@@ -77,6 +77,17 @@ function formatKickoff(kickoff) {
   return KICKOFF_FMT.format(new Date(ms)).replace(/\./g, '');
 }
 
+// Time-only (HH:MM, Brazil) — used on fixture cards once the day is chosen via the
+// date chips, so the card doesn't repeat the full date.
+const KICKOFF_TIME_FMT = new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'pt-BR', {
+  timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit',
+});
+function formatKickoffTime(kickoff) {
+  const ms = kickoffMs(kickoff);
+  if (ms == null) return '';
+  return KICKOFF_TIME_FMT.format(new Date(ms));
+}
+
 // Short date (no time) for round date ranges — "11 jun".
 const ROUND_DATE_FMT = new Intl.DateTimeFormat(lang === 'en' ? 'en-GB' : 'pt-BR', {
   timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'short',
@@ -1363,15 +1374,23 @@ function renderFixtureCard(it, focused = false) {
   const resultClass = pts == null ? ''
     : pts === 5 ? ' result-exact' : pts === 3 ? ' result-partial' : ' result-miss';
 
+  // The day is chosen via the date chips, so the card only needs the kickoff time
+  // (not the full date). Venue sits beside it; the lock hint moves to a footer.
   let topHtml;
+  let footHtml = '';
   if (live) {
     topHtml = renderLiveScore(r, isKnockout);
   } else {
-    const cd = !locked ? countdownLabel(ms) : null;
-    const cdHtml = cd ? `<span class="fx-countdown">🔒 ${cd}</span>` : '';
     const venue = venueLabel(match.id);
     const venueHtml = venue ? `<span class="fx-venue">🏟️ ${venue}</span>` : '';
-    topHtml = `<div class="fx-meta"><span class="fx-time">🕑 ${formatKickoff(r?.kickoff)}</span>${cdHtml}${venueHtml}</div>`;
+    topHtml = `<div class="fx-meta"><span class="fx-time">${formatKickoffTime(r?.kickoff)}</span>${venueHtml}</div>`;
+    const cd = !locked ? countdownLabel(ms) : null;
+    if (cd) {
+      footHtml = `<div class="fx-lock">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>${cd} · ${t('fx.tapEdit')}</span>
+      </div>`;
+    }
   }
 
   return `
@@ -1396,6 +1415,7 @@ function renderFixtureCard(it, focused = false) {
           <span class="team-name">${awayTeam}</span>
         </div>
       </div>
+      ${footHtml}
       ${pts != null ? renderMatchResult(r, isKnockout, pts) : ''}
     </div>`;
 }

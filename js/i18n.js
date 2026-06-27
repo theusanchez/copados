@@ -110,6 +110,7 @@ const DICT = {
     // --- fixtures ---
     'fx.today': 'Hoje',
     'fx.tomorrow': 'Amanhã',
+    'fx.tapEdit': 'toque para editar',
     'fx.empty': 'O calendário aparece aqui assim que os horários dos jogos forem publicados.',
 
     // --- match card ---
@@ -310,6 +311,7 @@ const DICT = {
 
     'fx.today': 'Today',
     'fx.tomorrow': 'Tomorrow',
+    'fx.tapEdit': 'tap to edit',
     'fx.empty': 'The schedule shows up here once kickoff times are published.',
 
     'live.now': 'LIVE',

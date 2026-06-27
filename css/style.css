@@ -5219,3 +5219,18 @@ body {
 .fx-chip.active .fx-chip-num {
   color: var(--onacc);
 }
+
+/* Fixture-card lock hint (footer) — day lives in the date chip, time in the header */
+.fx-lock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px 0;
+  color: var(--faint);
+}
+.fx-lock span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}

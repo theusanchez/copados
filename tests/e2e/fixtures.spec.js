@@ -41,7 +41,7 @@ test('matches are split into per-day chips, sorted, with a lock countdown', asyn
   // the lock countdown. A2, on a later day, isn't in the focused day's list.
   const cards = page.locator('#view-fixtures .fx-card');
   await expect(cards.nth(0)).toHaveAttribute('id', 'fx-match-A1');
-  await expect(page.locator('#fx-match-A1 .fx-countdown')).toContainText('trava em');
+  await expect(page.locator('#fx-match-A1 .fx-lock')).toContainText('trava em');
   await expect(page.locator('#fx-match-A2')).toHaveCount(0);
 
   // The last chip (latest day) reveals A2.
