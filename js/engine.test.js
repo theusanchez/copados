@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GROUPS } from './data.js';
-import { groupStageScorable, matchPoints, isLivePick } from './engine.js';
+import { groupStageScorable, matchPoints, isLivePick, buildKnockoutMatches } from './engine.js';
+import { THIRDS_TABLE, THIRDS_SLOT_ORDER } from './thirds-table.js';
 
 const ALL_GROUP = Object.values(GROUPS).flatMap(g => g.matches);
 
@@ -95,4 +96,60 @@ test('isLivePick: true só com re-palpite completo num slot de KO', () => {
   assert.equal(isLivePick(KO, { [KO]: { home: 1 } }), false);
   assert.equal(isLivePick(KO, {}), false);
   assert.equal(isLivePick('A1', { A1: { home: 1, away: 0 } }), false); // group id
+});
+
+// --- best-third allocation to R32 slots (official FIFA Annex C table) ---
+const B3_SLOTS = ['R32_02','R32_05','R32_07','R32_08','R32_09','R32_10','R32_13','R32_15'];
+const B3_ELIG = {
+  R32_02:'ABCDF', R32_05:'CDFGH', R32_07:'CEFHI', R32_08:'EHIJK',
+  R32_09:'BEFIJ', R32_10:'AEHIJ', R32_13:'EFGIJ', R32_15:'DEIJL',
+};
+// Craft an adv where each group's third is a recognisable token "T_<group>".
+function advForThirds(qGroups) {
+  const letters = 'ABCDEFGHIJKL'.split('');
+  const winners = {}, runners = {};
+  letters.forEach(g => { winners[g] = 'W_' + g; runners[g] = 'R_' + g; });
+  const bestThirds = qGroups.split('').map(g => ({ group: g, team: 'T_' + g }));
+  return { winners, runners, bestThirds, all: {}, thirds: bestThirds };
+}
+// away of each b3 slot, as a group letter
+function b3GroupsOf(bracket) {
+  const out = {};
+  B3_SLOTS.forEach(id => { out[id] = (bracket[id].awayTeam || '').replace('T_', ''); });
+  return out;
+}
+
+test('THIRDS_TABLE: 495 combinations, each a valid eligible perfect matching', () => {
+  assert.equal(Object.keys(THIRDS_TABLE).length, 495);
+  assert.deepEqual(THIRDS_SLOT_ORDER, B3_SLOTS);
+  for (const [q, val] of Object.entries(THIRDS_TABLE)) {
+    assert.equal(val.length, 8, `value length for ${q}`);
+    assert.equal(new Set(val).size, 8, `distinct groups for ${q}`);
+    THIRDS_SLOT_ORDER.forEach((slot, i) => {
+      assert.ok(q.includes(val[i]), `${q}: ${val[i]} must be a qualifying group`);
+      assert.ok(B3_ELIG[slot].includes(val[i]), `${q}: ${val[i]} not eligible for ${slot}`);
+    });
+  }
+});
+
+test('best-thirds routed by the official table — real 2026 case (Q=BDEFIJKL)', () => {
+  const bracket = buildKnockoutMatches(advForThirds('BDEFIJKL'), {});
+  assert.deepEqual(b3GroupsOf(bracket), {
+    R32_02: 'D', R32_05: 'F', R32_07: 'E', R32_08: 'K',
+    R32_09: 'B', R32_10: 'I', R32_13: 'J', R32_15: 'L',
+  });
+});
+
+test('best-thirds routed by the official table — Q=EFGHIJKL (row 1)', () => {
+  const bracket = buildKnockoutMatches(advForThirds('EFGHIJKL'), {});
+  assert.deepEqual(b3GroupsOf(bracket), {
+    R32_02: 'F', R32_05: 'G', R32_07: 'E', R32_08: 'K',
+    R32_09: 'I', R32_10: 'H', R32_13: 'J', R32_15: 'L',
+  });
+});
+
+test('incomplete bracket (<8 thirds) falls back to greedy without throwing', () => {
+  const adv = advForThirds('BD'); // only 2 thirds resolved
+  const bracket = buildKnockoutMatches(adv, {});
+  assert.ok(bracket.R32_02 && 'awayTeam' in bracket.R32_02);
 });

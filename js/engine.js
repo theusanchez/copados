@@ -1,4 +1,5 @@
 import { GROUPS, KNOCKOUT } from './data.js';
+import { THIRDS_TABLE, THIRDS_SLOT_ORDER } from './thirds-table.js';
 
 // Compute standings for one group given { matchId: {home:N, away:N} }
 export function groupStandings(groupKey, preds) {
@@ -73,8 +74,25 @@ export function buildKnockoutMatches(adv, koResults) {
   const resolved = {};
   const usedThirds = new Set(); // each 3rd-place team can only fill one slot
 
-  function resolveSlotTracked(slot) {
+  // Official FIFA allocation of the 8 best third-placed teams to the winner slots
+  // (Annex C, the 495-combination table in THIRDS_TABLE), keyed by which 8 groups
+  // produced a qualifying third. The greedy eligibility below is only a fallback for
+  // partial/preview brackets where the full set of 8 thirds isn't resolved yet.
+  const thirdByGroup = {};
+  adv.bestThirds.forEach(t => { thirdByGroup[t.group] = t.team; });
+  const qGroups = adv.bestThirds.map(t => t.group).sort().join('');
+  const tableRow = adv.bestThirds.length === 8 ? THIRDS_TABLE[qGroups] : null;
+  const b3Slot = {}; // matchId -> the third-place team officially assigned to it
+  if (tableRow) {
+    THIRDS_SLOT_ORDER.forEach((id, i) => {
+      const team = thirdByGroup[tableRow[i]];
+      if (team) b3Slot[id] = team;
+    });
+  }
+
+  function resolveSlotTracked(slot, matchId) {
     if (slot.type === 'b3') {
+      if (b3Slot[matchId]) { usedThirds.add(b3Slot[matchId]); return b3Slot[matchId]; }
       const eligible = adv.bestThirds.filter(
         t => slot.groups.includes(t.group) && !usedThirds.has(t.team)
       );
@@ -90,8 +108,8 @@ export function buildKnockoutMatches(adv, koResults) {
   const rounds = ['r32', 'r16', 'qf', 'sf', 'third', 'final'];
   rounds.forEach(round => {
     KNOCKOUT[round].forEach(match => {
-      const homeTeam = resolveSlotTracked(match.home);
-      const awayTeam = resolveSlotTracked(match.away);
+      const homeTeam = resolveSlotTracked(match.home, match.id);
+      const awayTeam = resolveSlotTracked(match.away, match.id);
       const r = koResults[match.id] || {};
       resolved[match.id] = {
         ...match,
