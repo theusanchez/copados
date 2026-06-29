@@ -1,16 +1,17 @@
-import { loginWithGoogle, logout, onAuthChange, loginAsGuest, registerWithEmail, loginWithEmail, sendMagicLink, completeMagicLinkIfPresent, upgradeGuest, upgradeGuestWithGoogle, saveUser, savePred, loadPreds, loadAllUsers, loadUserPreds, loadResults, watchResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
+import { loginWithGoogle, logout, onAuthChange, loginAsGuest, registerWithEmail, loginWithEmail, sendMagicLink, completeMagicLinkIfPresent, upgradeGuest, upgradeGuestWithGoogle, saveUser, savePred, saveKoLive, loadPreds, loadKoLive, loadUserData, loadAllUsers, loadResults, watchResults, createLeague, findLeagueByCode, joinLeague, loadUserLeagues } from './db.js';
 import { GROUPS, FLAGS, CODES, KNOCKOUT, ROUND_LABELS, HONOURS } from './data.js';
 import { SQUADS } from './squads.js';
 import { venueLabel } from './venues.js';
 import { FEATURES } from './features.js';
 import { t, tTeam, lang, setLang, applyStaticI18n } from './i18n.js';
-import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, bestStreak, perfectGroups, isNostradamus } from './engine.js';
+import { groupStandings, computeAdvancing, buildKnockoutMatches, resolveKnockout, scoreUser, matchPoints, isLivePick, koMatchupHit, bestStreak, perfectGroups, isNostradamus } from './engine.js';
 
 // -----------------------------------------------------------------------
 // State
 // -----------------------------------------------------------------------
 let currentUser = null;
 let predictions = {};       // { matchId: { home, away, penWinner? } }
+let koLive = {};            // { matchId: { home, away, penWinner? } } the user's KO live re-picks (real matchups)
 let results = {};           // { matchId: { home, away, status, kickoff, ... } } actual results
 let currentUserKo = {};     // resolved knockout for `predictions` (set before each render)
 let koFillLocked = true;     // true while the group stage is incomplete (blocks knockout filling)
@@ -22,6 +23,8 @@ let rankingRound = 'overall'; // ranking view scope: 'overall' or a RANKING_ROUN
 let fixturesDay = null;        // selected day (matchday key) in the Jogos view; null = auto
 let groupsOfficial = false;    // Grupos view: false = my picks, true = official results
 let groupsActiveTab = null;    // active group tab in the Grupos view (preserved across re-render)
+let koView = 'bracket';        // Mata-Mata view: 'bracket' = my predicted bracket, 'official' = real bracket + live re-picks
+const koSwapping = new Set();   // KO slots where the user tapped "trocar placar" on a nailed pick (UI-only)
 
 const KNOCKOUT_IDS = new Set(Object.values(KNOCKOUT).flat().map(m => m.id));
 
@@ -175,6 +178,27 @@ function predsComplete(preds) {
     Object.values(KNOCKOUT).flat().every(m => matchSettled(m.id, preds));
 }
 
+// --- Knockout live re-picks (hybrid scoring) -----------------------------
+// A KO slot's real matchup is known once the ingester resolves both teams.
+function koSlotResolved(id) {
+  const r = results[id];
+  return !!(r && r.homeTeam != null && r.awayTeam != null);
+}
+
+// A slot the user got wrong (or never predicted): resolved, but the predicted
+// matchup doesn't equal the real one. These are the ones a live re-pick recovers.
+function koIsGap(id) {
+  return koSlotResolved(id) && !koMatchupHit(id, currentUserKo, results);
+}
+
+// Slots that still need action now: resolved, errou, unlocked, and not yet given a
+// complete live pick. Drives boot routing into the fill screen and the "all done" state.
+function pendingKoGaps() {
+  if (!groupStageReady(predictions)) return [];
+  return [...KNOCKOUT_IDS].filter(id =>
+    koIsGap(id) && !isMatchLocked(id) && !isLivePick(id, koLive));
+}
+
 // Count how many group/knockout matches have a full scoreline, for the progress bar.
 function countFilled(preds) {
   const filled = m => {
@@ -267,7 +291,15 @@ onAuthChange(async user => {
 
   // We need the user's own picks to land on the right tab, but cap the wait so an
   // exhausted/slow Firestore can't freeze the loading screen.
-  predictions = await withTimeout(loadPreds(user.uid).catch(() => ({})), 5000, {});
+  // Self-load uses the non-counting loaders (loadUserData's read counter is reserved
+  // for the roster, which the read-budget test asserts on). Parallel + capped so a
+  // slow Firestore can't freeze the loading screen.
+  const [preds, kl] = await Promise.all([
+    withTimeout(loadPreds(user.uid).catch(() => ({})), 5000, {}),
+    withTimeout(loadKoLive(user.uid).catch(() => ({})), 5000, {}),
+  ]);
+  predictions = preds;
+  koLive = kl;
 
   restoreActiveLeague();
   showApp();
@@ -619,6 +651,38 @@ async function savePenWinner(matchId, team) {
   refreshKnockoutTeams();
 }
 
+// Live re-pick on the REAL matchup of a KO slot (scores the reduced 2/1 tier).
+// Stored separately from the predicted bracket so the prediction is never lost.
+async function saveKoLivePred(matchId, side, value) {
+  if (!currentUser || isMatchLocked(matchId)) return;
+  if (!koLive[matchId]) koLive[matchId] = {};
+  koLive[matchId][side] = value === '' ? null : Number(value);
+  // Don't rebuild the view here: like the group cards, the value already lives in the
+  // input, and a full re-render mid-entry would destroy the sibling input being typed.
+  await saveKoLive(currentUser.uid, matchId, koLive[matchId]);
+  syncOwnPredsToRoster();
+}
+
+async function saveKoLivePenWinner(matchId, team) {
+  if (!currentUser || isMatchLocked(matchId)) return;
+  if (!koLive[matchId]) koLive[matchId] = {};
+  koLive[matchId].penWinner = team;
+  await saveKoLive(currentUser.uid, matchId, koLive[matchId]);
+  syncOwnPredsToRoster();
+}
+
+// Discard a live re-pick (the "keep the nailed pick" / undo path), restoring the
+// slot to its predicted 5/3 scoring.
+async function clearKoLivePred(matchId) {
+  if (!currentUser || isMatchLocked(matchId)) return;
+  delete koLive[matchId];
+  // Overwrite the whole map so the removed key is actually gone in storage.
+  await saveKoLive(currentUser.uid, matchId, { home: null, away: null, penWinner: null });
+  syncOwnPredsToRoster();
+  renderProgress();
+  renderKnockoutView();
+}
+
 // -----------------------------------------------------------------------
 // Groups view
 // -----------------------------------------------------------------------
@@ -964,7 +1028,7 @@ function renderMatchCard(match, isKnockout, homeTeam, awayTeam) {
   const lockAttrs = locked ? 'readonly tabindex="-1"' : '';
   const r = results[match.id];
   const pts = r && r.status === 'finished' && r.home != null && r.away != null
-    ? matchPoints(match.id, predictions, currentUserKo, results)
+    ? matchPoints(match.id, predictions, currentUserKo, results, koLive)
     : null;
   const resultClass = pts == null ? ''
     : pts === 5 ? ' result-exact' : pts === 3 ? ' result-partial' : ' result-miss';
@@ -1149,19 +1213,40 @@ function collectLivePreds(groupKey) {
 // -----------------------------------------------------------------------
 // Knockout view
 // -----------------------------------------------------------------------
+const KO_ROUNDS = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
+
 function renderKnockoutView() {
   const container = document.getElementById('view-knockout');
   currentUserKo = resolveKnockout(predictions);
   koFillLocked = !groupStageReady(predictions);
-  // Mobile-first: a chip selector picks one round at a time, shown as a vertical list
-  // of matchup cards (instead of a cramped horizontal bracket on a phone).
-  const rounds = ['r32', 'r16', 'qf', 'sf', 'final', 'third'];
 
-  const chipsHtml = rounds.map((r, i) =>
+  // The "Meu chaveamento / Oficial" toggle only appears once the real bracket has
+  // started resolving — during the group stage there's nothing official to show.
+  const anyResolved = [...KNOCKOUT_IDS].some(id => koSlotResolved(id));
+  if (!anyResolved) koView = 'bracket';
+  const toggleHtml = anyResolved ? `
+    <div class="gp-view-toggle ko-view-toggle" role="group" aria-label="${t('ko.viewBracket')} / ${t('ko.viewOfficial')}">
+      <button class="gp-view-btn${koView === 'official' ? '' : ' active'}" data-koview="bracket">${t('ko.viewBracket')}</button>
+      <button class="gp-view-btn${koView === 'official' ? ' active' : ''}" data-koview="official">${t('ko.viewOfficial')}</button>
+    </div>` : '';
+
+  if (koView === 'official') {
+    container.innerHTML = `
+      <div class="compare-header"><h2>${t('nav.knockout')}</h2></div>
+      ${toggleHtml}
+      <div id="ko-official"></div>`;
+    wireKoToggle(container);
+    renderOfficialKnockout();
+    return;
+  }
+
+  // Predicted-bracket mode: mobile-first chip selector picks one round at a time,
+  // shown as a vertical list of matchup cards.
+  const chipsHtml = KO_ROUNDS.map((r, i) =>
     `<button class="ko-chip${i === 0 ? ' active' : ''}" type="button" data-round="${r}">${t('round.' + r)}</button>`
   ).join('');
 
-  const panelsHtml = rounds.map((r, i) =>
+  const panelsHtml = KO_ROUNDS.map((r, i) =>
     `<div class="ko-round-panel${i === 0 ? '' : ' hidden'}" id="ko-panel-${r}">
        <h3 class="matchday-label">${t('round.' + r)}</h3>
        <div class="ko-col-body" id="ko-col-${r}"></div>
@@ -1173,13 +1258,15 @@ function renderKnockoutView() {
 
   container.innerHTML = `
     <div class="compare-header"><h2>${t('nav.knockout')}</h2></div>
+    ${toggleHtml}
     <div class="ko-chips">${chipsHtml}</div>
     ${lockNotice}
     <div class="ko-hint">${t('ko.hint')}</div>
     <div class="ko-rounds">${panelsHtml}</div>
   `;
 
-  rounds.forEach(r => renderKnockoutRound(r));
+  KO_ROUNDS.forEach(r => renderKnockoutRound(r));
+  wireKoToggle(container);
 
   // Round chip switching (same pattern as the group selector).
   container.querySelectorAll('.ko-chip').forEach(chip => {
@@ -1188,6 +1275,212 @@ function renderKnockoutView() {
       chip.classList.add('active');
       container.querySelectorAll('.ko-round-panel').forEach(p => p.classList.add('hidden'));
       container.querySelector(`#ko-panel-${chip.dataset.round}`)?.classList.remove('hidden');
+    });
+  });
+}
+
+function wireKoToggle(container) {
+  container.querySelectorAll('.gp-view-btn[data-koview]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const next = btn.dataset.koview;
+      if (next === koView) return;
+      koView = next;
+      renderKnockoutView();
+    });
+  });
+}
+
+// Official bracket view = the guided fill screen. Splits the resolved KO slots into
+// gaps (errou → live-pick, 2/1) and cravados (acertou → frozen 5/3), gaps first.
+function renderOfficialKnockout() {
+  const host = document.getElementById('ko-official');
+  if (!host) return;
+
+  const gaps = [], cravados = [];
+  KO_ROUNDS.forEach(rk => KNOCKOUT[rk].forEach(m => {
+    if (!koSlotResolved(m.id)) return;
+    const hit = koMatchupHit(m.id, currentUserKo, results);
+    const editable = isLivePick(m.id, koLive) || koSwapping.has(m.id);
+    if (hit && !editable) cravados.push(m);
+    else gaps.push(m);
+  }));
+
+  if (!gaps.length && !cravados.length) {
+    host.innerHTML = `<div class="ko-locked-notice">${t('ko.officialEmpty')}</div>`;
+    return;
+  }
+
+  const pending = pendingKoGaps().length;
+  const head = pending > 0
+    ? `<div class="ko-fill-head"><h3>${t('ko.fillTitle')}</h3><p>${t('ko.fillSub')}</p></div>`
+    : `<div class="ko-fill-head ko-alldone"><p>${t('ko.allDone')}</p></div>`;
+
+  const gapsHtml = gaps.length
+    ? `<h3 class="matchday-label">${t('ko.gapsLabel')}</h3>${gaps.map(renderKoLiveCard).join('')}`
+    : '';
+  const cravadosHtml = cravados.length
+    ? `<h3 class="matchday-label">${t('ko.cravadosLabel')}</h3>${cravados.map(renderKoCravadoCard).join('')}`
+    : '';
+
+  host.innerHTML = head + gapsHtml + cravadosHtml;
+  wireOfficialKnockout(host);
+}
+
+// A live re-pick card: real teams, editable scoreline bound to koLive (2/1 tier).
+// Falls back to a read-only result + points once the game is locked/finished.
+function renderKoLiveCard(m) {
+  const r = results[m.id];
+  const hTeam = r.homeTeam, aTeam = r.awayTeam;
+  const live = koLive[m.id] || {};
+  const hVal = live.home != null ? live.home : '';
+  const aVal = live.away != null ? live.away : '';
+  const locked = isMatchLocked(m.id);
+  const lockAttrs = locked ? 'readonly tabindex="-1"' : '';
+  const finished = r.status === 'finished' && r.home != null && r.away != null;
+  const pts = finished ? matchPoints(m.id, predictions, currentUserKo, results, koLive) : null;
+  const resultClass = pts == null ? '' : pts >= 2 ? ' result-exact' : pts >= 1 ? ' result-partial' : ' result-miss';
+  const kickoff = formatKickoff(r.kickoff);
+  const venue = venueLabel(m.id);
+  const meta = [];
+  if (kickoff) meta.push(`<span aria-hidden="true">🕑</span> ${kickoff}`);
+  if (venue) meta.push(`🏟️ <span class="venue-name">${venue}</span>`);
+  const header = meta.length ? `<div class="match-kickoff">${meta.join(' · ')}</div>` : '';
+
+  const km = currentUserKo[m.id];
+  const predMatchup = km && km.homeTeam != null
+    ? `${tTeam(km.homeTeam)} × ${tTeam(km.awayTeam)}` : '—';
+  const showPen = hVal !== '' && aVal !== '' && Number(hVal) === Number(aVal);
+  const penHtml = `
+    <div class="pen-section${showPen ? '' : ' hidden'}" id="pen-live-${m.id}">
+      <span class="pen-label">${t('pens.label')}</span>
+      <label class="pen-option">
+        <input type="radio" name="pen-live-${m.id}" value="${hTeam}"
+          ${live.penWinner === hTeam ? 'checked' : ''} ${locked ? 'disabled' : ''}
+          class="ko-live-pen" data-match-id="${m.id}">
+        <span>${flag(hTeam)} ${tTeam(hTeam)}</span>
+      </label>
+      <label class="pen-option">
+        <input type="radio" name="pen-live-${m.id}" value="${aTeam}"
+          ${live.penWinner === aTeam ? 'checked' : ''} ${locked ? 'disabled' : ''}
+          class="ko-live-pen" data-match-id="${m.id}">
+        <span>${flag(aTeam)} ${tTeam(aTeam)}</span>
+      </label>
+    </div>`;
+
+  const undo = (!locked && (isLivePick(m.id, koLive) || koSwapping.has(m.id)) && koMatchupHit(m.id, currentUserKo, results))
+    ? `<button class="ko-swap-cancel" type="button" data-match-id="${m.id}">${t('ko.swapCancel')}</button>` : '';
+
+  return `
+    <div class="match-card ko-live-card${locked ? ' locked' : ''}${resultClass}" id="match-${m.id}">
+      ${header}
+      <div class="match-body">
+        <div class="team home-team">
+          <span class="team-name">${tTeam(hTeam)}</span>
+          <span class="team-flag">${flag(hTeam)}</span>
+        </div>
+        <div class="score-area">
+          <input type="number" min="0" max="20" class="score-input ko-live-input"
+            data-match-id="${m.id}" data-side="home" value="${hVal}" ${lockAttrs}
+            aria-label="${t('aria.score', { team: tTeam(hTeam) })}">
+          <span class="score-sep">×</span>
+          <input type="number" min="0" max="20" class="score-input ko-live-input"
+            data-match-id="${m.id}" data-side="away" value="${aVal}" ${lockAttrs}
+            aria-label="${t('aria.score', { team: tTeam(aTeam) })}">
+        </div>
+        <div class="team away-team">
+          <span class="team-flag">${flag(aTeam)}</span>
+          <span class="team-name">${tTeam(aTeam)}</span>
+        </div>
+      </div>
+      ${penHtml}
+      ${renderMatchResult(r, true, pts)}
+      <div class="ko-card-foot">
+        <span class="ko-badge ko-badge-live">${t('ko.liveBadge')}</span>
+        <span class="ko-predicted">${t('ko.youPredicted', { matchup: predMatchup })}</span>
+        ${undo}
+      </div>
+    </div>`;
+}
+
+// A nailed (cravado) card: the predicted scoreline frozen at 5/3, read-only, with a
+// guarded "trocar placar" that downgrades to a live 2/1 pick.
+function renderKoCravadoCard(m) {
+  const r = results[m.id];
+  const km = currentUserKo[m.id];
+  const hTeam = r.homeTeam, aTeam = r.awayTeam;
+  // Align the predicted scoreline to the real home/away orientation for display.
+  const predHome = km.homeTeam === r.homeTeam ? km.home : km.away;
+  const predAway = km.homeTeam === r.homeTeam ? km.away : km.home;
+  const locked = isMatchLocked(m.id);
+  const finished = r.status === 'finished' && r.home != null && r.away != null;
+  const pts = finished ? matchPoints(m.id, predictions, currentUserKo, results, koLive) : null;
+  const resultClass = pts == null ? '' : pts >= 5 ? ' result-exact' : pts >= 3 ? ' result-partial' : ' result-miss';
+  const kickoff = formatKickoff(r.kickoff);
+  const venue = venueLabel(m.id);
+  const meta = [];
+  if (kickoff) meta.push(`<span aria-hidden="true">🕑</span> ${kickoff}`);
+  if (venue) meta.push(`🏟️ <span class="venue-name">${venue}</span>`);
+  const header = meta.length ? `<div class="match-kickoff">${meta.join(' · ')}</div>` : '';
+  const swapBtn = locked ? '' :
+    `<button class="ko-swap" type="button" data-match-id="${m.id}">${t('ko.swap')}</button>`;
+
+  return `
+    <div class="match-card ko-cravado-card${locked ? ' locked' : ''}${resultClass}" id="match-${m.id}">
+      ${header}
+      <div class="match-body">
+        <div class="team home-team">
+          <span class="team-name">${tTeam(hTeam)}</span>
+          <span class="team-flag">${flag(hTeam)}</span>
+        </div>
+        <div class="score-area ko-frozen">
+          <span class="ko-frozen-num">${predHome}</span>
+          <span class="score-sep">×</span>
+          <span class="ko-frozen-num">${predAway}</span>
+        </div>
+        <div class="team away-team">
+          <span class="team-flag">${flag(aTeam)}</span>
+          <span class="team-name">${tTeam(aTeam)}</span>
+        </div>
+      </div>
+      ${renderMatchResult(r, true, pts)}
+      <div class="ko-card-foot">
+        <span class="ko-badge ko-badge-cravado">${t('ko.cravadoBadge')}</span>
+        ${swapBtn}
+      </div>
+    </div>`;
+}
+
+function wireOfficialKnockout(host) {
+  host.querySelectorAll('.ko-live-input').forEach(input => {
+    input.addEventListener('blur', async () => {
+      const { matchId, side } = input.dataset;
+      await saveKoLivePred(matchId, side, input.value);
+    });
+    input.addEventListener('input', () => {
+      const sec = document.getElementById(`pen-live-${input.dataset.matchId}`);
+      if (!sec) return;
+      const ins = host.querySelectorAll(`.ko-live-input[data-match-id="${input.dataset.matchId}"]`);
+      let h = null, a = null;
+      ins.forEach(i => { if (i.dataset.side === 'home') h = i.value; else a = i.value; });
+      sec.classList.toggle('hidden', !(h !== '' && a !== '' && Number(h) === Number(a)));
+    });
+  });
+  host.querySelectorAll('.ko-live-pen').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) saveKoLivePenWinner(radio.dataset.matchId, radio.value);
+    });
+  });
+  host.querySelectorAll('.ko-swap').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm(t('ko.swapWarn'))) return;
+      koSwapping.add(btn.dataset.matchId);
+      renderKnockoutView();
+    });
+  });
+  host.querySelectorAll('.ko-swap-cancel').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      koSwapping.delete(btn.dataset.matchId);
+      await clearKoLivePred(btn.dataset.matchId);
     });
   });
 }
@@ -1425,6 +1718,23 @@ function renderFixturesView({ scroll = false } = {}) {
     input.addEventListener('blur', () => {
       const { matchId, side } = input.dataset;
       savePrediction(matchId, side, input.value);
+      updateFixturePenSection(container, matchId);
+    });
+    input.addEventListener('input', () => updateFixturePenSection(container, input.dataset.matchId));
+  });
+
+  container.querySelectorAll('.fx-pen-radio').forEach(radio => {
+    radio.addEventListener('change', () => {
+      if (radio.checked) savePenWinner(radio.dataset.matchId, radio.value);
+    });
+  });
+
+  // A read-only gap card links straight to the Mata-Mata › Oficial fill screen.
+  container.querySelectorAll('.fx-gap-hint').forEach(btn => {
+    btn.addEventListener('click', () => {
+      koView = 'official';
+      renderKnockoutView();
+      switchMainView('knockout');
     });
   });
 
@@ -1450,6 +1760,16 @@ function renderFixturesView({ scroll = false } = {}) {
 
 function renderFixtureCard(it, focused = false) {
   const { match, isKnockout, homeTeam, awayTeam, ms } = it;
+
+  // A resolved knockout slot whose real matchup differs from the user's predicted
+  // bracket is a "gap": it's re-picked on the Mata-Mata › Oficial screen (2/1 tier).
+  // In this chronological list it stays read-only, so a score typed against the
+  // official teams can never leak into the predicted-bracket store (which would then
+  // surface as the user's *wrong* matchup over in the Mata-Mata view).
+  if (isKnockout && koSlotResolved(match.id) && !koMatchupHit(match.id, currentUserKo, results)) {
+    return renderFixtureGapCard(it, focused);
+  }
+
   const pred = predictions[match.id] || {};
   const hVal = pred.home != null ? pred.home : '';
   const aVal = pred.away != null ? pred.away : '';
@@ -1459,7 +1779,7 @@ function renderFixtureCard(it, focused = false) {
   const locked = isMatchLocked(match.id) || koLocked;
   const lockAttrs = locked ? 'readonly tabindex="-1"' : '';
   const pts = r && r.status === 'finished' && r.home != null && r.away != null
-    ? matchPoints(match.id, predictions, currentUserKo, results)
+    ? matchPoints(match.id, predictions, currentUserKo, results, koLive)
     : null;
   const resultClass = pts == null ? ''
     : pts === 5 ? ' result-exact' : pts === 3 ? ' result-partial' : ' result-miss';
@@ -1481,6 +1801,30 @@ function renderFixtureCard(it, focused = false) {
         <span>${cd} · ${t('fx.tapEdit')}</span>
       </div>`;
     }
+  }
+
+  // Knockout draws advance on penalties: same selector as the bracket view, but with
+  // fixtures-scoped ids (`fx-pen-*`) so it doesn't collide with the bracket's `pen-*`.
+  let penHtml = '';
+  if (isKnockout) {
+    const showPen = pred.home != null && pred.away != null &&
+      Number(pred.home) === Number(pred.away);
+    penHtml = `
+      <div class="pen-section${showPen ? '' : ' hidden'}" id="fx-pen-${match.id}">
+        <span class="pen-label">${t('pens.label')}</span>
+        <label class="pen-option">
+          <input type="radio" name="fx-pen-${match.id}" value="${homeTeam}"
+            ${pred.penWinner === homeTeam ? 'checked' : ''} ${locked ? 'disabled' : ''}
+            class="fx-pen-radio" data-match-id="${match.id}">
+          <span>${flag(homeTeam)} ${homeTeam}</span>
+        </label>
+        <label class="pen-option">
+          <input type="radio" name="fx-pen-${match.id}" value="${awayTeam}"
+            ${pred.penWinner === awayTeam ? 'checked' : ''} ${locked ? 'disabled' : ''}
+            class="fx-pen-radio" data-match-id="${match.id}">
+          <span>${flag(awayTeam)} ${awayTeam}</span>
+        </label>
+      </div>`;
   }
 
   return `
@@ -1505,9 +1849,76 @@ function renderFixtureCard(it, focused = false) {
           <span class="team-name">${awayTeam}</span>
         </div>
       </div>
+      ${penHtml}
       ${footHtml}
       ${pts != null ? renderMatchResult(r, isKnockout, pts) : ''}
     </div>`;
+}
+
+// Read-only knockout card for the chronological list: the real matchup is out but the
+// user's predicted bracket missed it. The pick is made on Mata-Mata › Oficial (2/1);
+// here we just mirror whatever live re-pick they've made (if any) so the two views agree.
+function renderFixtureGapCard(it, focused = false) {
+  const { match, homeTeam, awayTeam } = it;
+  const r = results[match.id];
+  const live = isInPlay(r);
+  const lp = koLive[match.id] || {};
+  const hasPick = lp.home != null && lp.away != null;
+  const finished = r.status === 'finished' && r.home != null && r.away != null;
+  const pts = finished ? matchPoints(match.id, predictions, currentUserKo, results, koLive) : null;
+  // Live re-picks score the reduced tier: 2 (exact) / 1 (outcome).
+  const resultClass = pts == null ? ''
+    : pts >= 2 ? ' result-exact' : pts >= 1 ? ' result-partial' : ' result-miss';
+
+  let topHtml;
+  if (live) {
+    topHtml = renderLiveScore(r, true);
+  } else {
+    const venue = venueLabel(match.id);
+    const venueHtml = venue ? `<span class="fx-venue">🏟️ ${venue}</span>` : '';
+    topHtml = `<div class="fx-meta"><span class="fx-time">${formatKickoffTime(r?.kickoff)}</span>${venueHtml}</div>`;
+  }
+
+  const hCell = hasPick ? lp.home : '?';
+  const aCell = hasPick ? lp.away : '?';
+  const penLine = hasPick && lp.penWinner
+    ? `<div class="fx-gap-pen">${t('pens.label')} ${flag(lp.penWinner)} ${lp.penWinner}</div>` : '';
+  const hint = !isMatchLocked(match.id)
+    ? `<button type="button" class="fx-gap-hint" data-ko-official>${t('fx.fillOfficial')}</button>` : '';
+
+  return `
+    <div class="match-card fx-card fx-gap${live ? ' live' : ''}${live && r?.status === 'paused' ? ' paused' : ''}${focused ? ' fx-focus' : ''}${resultClass}" id="fx-match-${match.id}">
+      ${topHtml}
+      <div class="match-body">
+        <div class="team home-team">
+          <span class="team-name">${homeTeam}</span>
+          <span class="team-flag">${flag(homeTeam)}</span>
+        </div>
+        <div class="score-area ko-frozen">
+          <span class="ko-frozen-num">${hCell}</span>
+          <span class="score-sep">×</span>
+          <span class="ko-frozen-num">${aCell}</span>
+        </div>
+        <div class="team away-team">
+          <span class="team-flag">${flag(awayTeam)}</span>
+          <span class="team-name">${awayTeam}</span>
+        </div>
+      </div>
+      ${penLine}
+      ${hint}
+      ${pts != null ? renderMatchResult(r, true, pts) : ''}
+    </div>`;
+}
+
+// Show/hide a fixture knockout card's penalty selector as its scoreline becomes a
+// draw. Scoped to the fixtures container so it never touches the bracket's `pen-*`.
+function updateFixturePenSection(container, matchId) {
+  const inputs = container.querySelectorAll(`.score-input[data-match-id="${matchId}"]`);
+  if (!inputs.length) return;
+  let h = null, a = null;
+  inputs.forEach(i => { if (i.dataset.side === 'home') h = i.value; else a = i.value; });
+  const sec = container.querySelector(`#fx-pen-${matchId}`);
+  if (sec) sec.classList.toggle('hidden', !(h !== '' && a !== '' && Number(h) === Number(a)));
 }
 
 // A compact signature of the mutable result fields (status + scoreline), so we only
@@ -1529,12 +1940,27 @@ function renderActiveResultsView() {
 
 // Initial results read (loadResults on boot) landed: render everything that
 // depends on results, then start the live listener if a match is on/imminent.
+let koRouteChecked = false; // boot-time guard: route into the fill screen at most once
+
 function onResultsLoaded() {
   renderProgress();
   renderGroupsView();
   renderKnockoutView();
   renderActiveResultsView();
   syncLiveListener();
+
+  // Guided fill: on boot, if the real bracket left the user with confrontos to
+  // re-pick, land them on the Mata-Mata in Oficial mode. Only once, and only while
+  // they're still on the default landing (don't yank someone who already navigated).
+  if (!koRouteChecked) {
+    koRouteChecked = true;
+    const active = document.querySelector('.nav-tab.active')?.dataset.view;
+    if ((active === 'groups' || active === 'fixtures') && pendingKoGaps().length) {
+      koView = 'official';
+      renderKnockoutView();
+      switchMainView('knockout');
+    }
+  }
 }
 
 // Live results arrive via a Firestore real-time listener (watchResults): instant
@@ -1614,21 +2040,29 @@ async function loadRoster({ force = false } = {}) {
     // renders the literal string "null" for them. The user list is cheap (one read
     // per user); predictions are the expensive part and are fetched lazily below.
     const users = (await loadAllUsers()).map(u => ({ ...u, displayName: u.displayName || 'Sem nome' }));
-    rosterCache = { users, preds: {} };
+    rosterCache = { users, preds: {}, koLive: {} };
   }
   // Only the users actually shown (the active league's scope) need their predictions
   // read. Cached per uid, so switching leagues fetches just the newly-scoped users
-  // and a re-render never re-reads what's already loaded.
+  // and a re-render never re-reads what's already loaded. One read brings both the
+  // predicted picks and the live re-picks (same doc) — needed to score the knockout.
   const scoped = scopeUsers(rosterCache.users);
   await Promise.all(scoped.map(async u => {
-    if (!rosterCache.preds[u.uid]) rosterCache.preds[u.uid] = await loadUserPreds(u.uid);
+    if (!rosterCache.preds[u.uid]) {
+      const d = await loadUserData(u.uid);
+      rosterCache.preds[u.uid] = d.matches;
+      rosterCache.koLive[u.uid] = d.koLive;
+    }
   }));
   return rosterCache;
 }
 
 // Reflect the current user's own edits into the shared cache without a read.
 function syncOwnPredsToRoster() {
-  if (rosterCache && currentUser) rosterCache.preds[currentUser.uid] = { ...predictions };
+  if (rosterCache && currentUser) {
+    rosterCache.preds[currentUser.uid] = { ...predictions };
+    rosterCache.koLive[currentUser.uid] = { ...koLive };
+  }
 }
 
 const refreshBtnHtml =
@@ -1647,7 +2081,7 @@ function wireRefresh(container, rerender) {
 // Open the comparison modal for "me vs them", building both entries from the
 // already-loaded roster + preds map. Reused by the ranking cards. Comparing
 // yourself (or an unknown uid) is a no-op.
-function openComparison(uid, roster, predsByUid) {
+function openComparison(uid, roster, predsByUid, koLiveByUid = {}) {
   if (!uid || uid === currentUser?.uid) return;
   const entryFor = (u) => {
     const preds = predsByUid[u.uid] || {};
@@ -1658,6 +2092,7 @@ function openComparison(uid, roster, predsByUid) {
       user: u,
       preds,
       koMatches,
+      koLive: koLiveByUid[u.uid] || {},
       champion: groupStageReady(preds) ? championOf(koMatches) : '?',
       complete: predsComplete(preds),
     };
@@ -1722,8 +2157,8 @@ function renderComparison(me, them) {
       const same = bothFilled && Number(mp.home) === Number(tp.home) && Number(mp.away) === Number(tp.away);
       const r = results[m.id];
       const finished = r && r.status === 'finished' && r.home != null && r.away != null;
-      const mePts = finished ? matchPoints(m.id, me.preds, me.koMatches, results) : null;
-      const themPts = finished ? matchPoints(m.id, them.preds, them.koMatches, results) : null;
+      const mePts = finished ? matchPoints(m.id, me.preds, me.koMatches, results, me.koLive) : null;
+      const themPts = finished ? matchPoints(m.id, them.preds, them.koMatches, results, them.koLive) : null;
       if (finished) { myG += mePts; themG += themPts; anyFinished = true; }
       const mid = finished
         ? `<span class="cmp-fx-result">${r.home} — ${r.away}<span class="cmp-fx-label">${t('cmp.result')}</span></span>`
@@ -1772,8 +2207,8 @@ function renderComparison(me, them) {
     const matches = KNOCKOUT[r].map(m => {
       const res = results[m.id];
       const finished = res && res.status === 'finished' && res.home != null && res.away != null;
-      const mePts = finished ? matchPoints(m.id, me.preds, me.koMatches, results) : null;
-      const themPts = finished ? matchPoints(m.id, them.preds, them.koMatches, results) : null;
+      const mePts = finished ? matchPoints(m.id, me.preds, me.koMatches, results, me.koLive) : null;
+      const themPts = finished ? matchPoints(m.id, them.preds, them.koMatches, results, them.koLive) : null;
       return `
       <div class="cmp-match cmp-ko-match">
         ${koOfficial(m)}
@@ -1787,8 +2222,8 @@ function renderComparison(me, them) {
     return `<div class="cmp-group"><div class="cmp-group-head"><h4 class="cmp-group-title">${t('round.' + r)}</h4></div>${matches}</div>`;
   }).join('');
 
-  const myTotal = scoreUser(me.preds, results).total;
-  const themTotal = scoreUser(them.preds, results).total;
+  const myTotal = scoreUser(me.preds, results, me.koLive).total;
+  const themTotal = scoreUser(them.preds, results, them.koLive).total;
 
   modal.classList.remove('hidden');
   detail.innerHTML = `
@@ -2065,7 +2500,7 @@ async function renderRankingView() {
   const container = document.getElementById('view-ranking');
   container.innerHTML = `<p class="loading-msg">${t('common.loading')}</p>`;
 
-  const { users: roster, preds } = await loadRoster();
+  const { users: roster, preds, koLive: koLiveByUid } = await loadRoster();
   const users = scopeUsers(roster);
 
   // Which rounds have been (at least partially) played, in order.
@@ -2087,9 +2522,9 @@ async function renderRankingView() {
 
   const entries = users.map(u => {
     if (roundMode) {
-      const upTo = scoreUser(preds[u.uid], resultsUpTo(scopeIdx));
+      const upTo = scoreUser(preds[u.uid], resultsUpTo(scopeIdx), koLiveByUid[u.uid]);
       const before = scopeIdx > 0
-        ? scoreUser(preds[u.uid], resultsUpTo(scopeIdx - 1))
+        ? scoreUser(preds[u.uid], resultsUpTo(scopeIdx - 1), koLiveByUid[u.uid])
         : { total: 0, exact: 0, correct: 0 };
       return {
         user: u,
@@ -2099,8 +2534,8 @@ async function renderRankingView() {
         prev: null, prevTotal: 0, roundExact: 0, streak: 0, perfect: 0, nostradamus: false,
       };
     }
-    const cur = scoreUser(preds[u.uid], results);
-    const prev = prevResults ? scoreUser(preds[u.uid], prevResults) : null;
+    const cur = scoreUser(preds[u.uid], results, koLiveByUid[u.uid]);
+    const prev = prevResults ? scoreUser(preds[u.uid], prevResults, koLiveByUid[u.uid]) : null;
     return {
       user: u, ...cur, prev, prevTotal: prev ? prev.total : 0,
       roundExact: cur.exact - (prev ? prev.exact : 0),
@@ -2163,7 +2598,7 @@ async function renderRankingView() {
         ${avatarHtml(e.user, 'ranking-avatar')}
         <div class="ranking-info">
           <span class="ranking-name">${escapeHtml(e.user.displayName)}${isMe ? t('rank.me') : ''}</span>
-          <span class="ranking-stats">${t('rank.stats', { exact: e.exact, correct: e.correct })}</span>
+          <span class="ranking-stats">${t('rank.stats', { exact: e.exact, correct: e.correct })}${e.live > 0 ? ` · <span class="ranking-live">${t('rank.livePts', { n: e.live })}</span>` : ''}</span>
           ${badgesFor(e, isLeaderOf(e), isRoundTopOf(e))}
         </div>
         <span class="ranking-points">${roundBadgeFor(e)}<span class="ranking-total">${e.total}<small>pts</small></span></span>
@@ -2223,7 +2658,7 @@ async function renderRankingView() {
   });
 
   container.querySelectorAll('.rank-clickable[data-uid]').forEach(card => {
-    const open = () => openComparison(card.dataset.uid, users, preds);
+    const open = () => openComparison(card.dataset.uid, users, preds, koLiveByUid);
     card.addEventListener('click', open);
     card.addEventListener('keydown', ev => {
       if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); }
@@ -2259,7 +2694,7 @@ async function renderAdminView() {
   if (!isAdmin()) { container.innerHTML = ''; return; }
   container.innerHTML = `<p class="loading-msg">${t('common.loading')}</p>`;
 
-  const { users: roster, preds } = await loadRoster();
+  const { users: roster, preds, koLive: koLiveByUid } = await loadRoster();
   const users = scopeUsers(roster);
 
   // Both lists come from the roster already loaded — no extra reads. `updatedAt` is
@@ -2357,7 +2792,7 @@ async function renderAdminView() {
     const p = preds[u.uid] || {};
     return {
       user: u,
-      total: scoreUser(p, results).total,
+      total: scoreUser(p, results, koLiveByUid[u.uid]).total,
       champion: groupStageReady(p) ? championOf(resolveKnockout(p)) : '?',
     };
   }).sort((a, b) => b.total - a.total);

@@ -1,8 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { boot, user, enableLive, fullPreds } from './helpers.js';
+import { resolveKnockout } from '../../js/engine.js';
 
 const HOUR = 3600000;
 const DAY = 86400000;
+
+// A predicted bracket derived from the canonical full preds, so we can seed real R32
+// matchups that the user nailed (hit → editable, full tier) or missed (gap → read-only).
+const KO_PREDS = fullPreds();
+const KO = resolveKnockout(KO_PREDS);
+const KO_HIT = KO['R32_01'];   // seed R32_01's real teams == predicted → not a gap
+const KO_OTHER = KO['R32_05']; // its teams can't equal R32_02's predicted pair → gap
 
 function openFixtures(page) {
   return page.locator('.nav-tab[data-view="fixtures"]').click();
@@ -165,4 +173,63 @@ test('a live match in the fixtures list shows the AO VIVO badge', async ({ page 
   await openFixtures(page);
   await expect(page.locator('#fx-match-A1')).toHaveClass(/\blive\b/);
   await expect(page.locator('#fx-match-A1 .live-score')).toContainText('2 × 1');
+});
+
+// Bug 1: a knockout slot the user got wrong shows the OFFICIAL teams in the Jogos list,
+// but stays read-only — entering a score there must not leak into the predicted bracket.
+test('a wrong-matchup knockout slot is read-only and points to Oficial', async ({ page }) => {
+  const future = Date.now() + 6 * HOUR;
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [user('me', 'Eu')],
+    predictions: { me: KO_PREDS },
+    results: {
+      R32_02: { status: 'scheduled', homeTeam: KO_OTHER.homeTeam, awayTeam: KO_OTHER.awayTeam, kickoff: future },
+    },
+  });
+  await openFixtures(page);
+
+  const gap = page.locator('#fx-match-R32_02');
+  await expect(gap).toHaveClass(/\bfx-gap\b/);
+  await expect(gap).toContainText(KO_OTHER.homeTeam);   // the REAL home team, not the predicted one
+  await expect(gap.locator('.score-input')).toHaveCount(0); // no editable inputs → can't corrupt the bracket
+  await expect(gap.locator('.fx-gap-hint')).toBeVisible();
+
+  // The hint deep-links into the Mata-Mata › Oficial fill screen.
+  await gap.locator('.fx-gap-hint').click();
+  await expect(page.locator('.nav-tab[data-view="knockout"]')).toHaveClass(/\bactive\b/);
+  await expect(page.locator('.gp-view-btn[data-koview="official"]')).toHaveClass(/\bactive\b/);
+});
+
+// Bug 2: a knockout slot the user can edit in the Jogos list must offer the penalty
+// winner once the predicted scoreline is a draw, and persist the choice.
+test('knockout fixture: penalty winner can be picked on a drawn scoreline', async ({ page }) => {
+  const future = Date.now() + 6 * HOUR;
+  await boot(page, {
+    currentUser: user('me', 'Eu'),
+    users: [user('me', 'Eu')],
+    predictions: { me: KO_PREDS },
+    results: {
+      R32_01: { status: 'scheduled', homeTeam: KO_HIT.homeTeam, awayTeam: KO_HIT.awayTeam, kickoff: future },
+    },
+  });
+  await openFixtures(page);
+
+  const card = page.locator('#fx-match-R32_01');
+  await expect(card).not.toHaveClass(/\bfx-gap\b/);
+  await expect(page.locator('#fx-pen-R32_01')).toHaveClass(/\bhidden\b/); // not a draw yet
+
+  await card.locator('.score-input[data-side="home"]').fill('1');
+  const away = card.locator('.score-input[data-side="away"]');
+  await away.fill('1');
+  await away.blur();
+
+  const pen = page.locator('#fx-pen-R32_01');
+  await expect(pen).not.toHaveClass(/\bhidden\b/);
+  await pen.locator(`.fx-pen-radio[value="${KO_HIT.homeTeam}"]`).check();
+
+  // The choice survives a re-render (navigate away and back).
+  await page.locator('.nav-tab[data-view="groups"]').click();
+  await openFixtures(page);
+  await expect(page.locator(`#fx-pen-R32_01 .fx-pen-radio[value="${KO_HIT.homeTeam}"]`)).toBeChecked();
 });

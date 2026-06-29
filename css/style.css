@@ -4170,6 +4170,125 @@ body {
   color: var(--onacc);
 }
 
+/* Knockout official / guided fill screen */
+.ko-view-toggle {
+  margin-top: var(--space-3);
+}
+.ko-fill-head {
+  margin: var(--space-4) 0 var(--space-2);
+}
+.ko-fill-head h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+.ko-fill-head p {
+  font-size: 13px;
+  color: var(--sub);
+  margin: 0;
+  line-height: 1.4;
+}
+.ko-fill-head.ko-alldone {
+  background: var(--accbg);
+  border: 1px solid var(--accbd2);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  text-align: center;
+}
+.ko-fill-head.ko-alldone p {
+  color: var(--accink);
+  font-weight: 600;
+}
+.ko-card-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bd2);
+}
+.ko-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.ko-badge-cravado {
+  background: var(--acc);
+  color: var(--onacc);
+}
+.ko-badge-live {
+  background: var(--elev);
+  color: var(--sub);
+  border: 1px solid var(--bd-strong);
+}
+.ko-predicted {
+  font-size: 11px;
+  color: var(--faint);
+  font-weight: 500;
+}
+.ko-swap,
+.ko-swap-cancel {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accink);
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  text-decoration: underline;
+}
+.ko-swap-cancel {
+  color: var(--sub);
+}
+.ranking-live {
+  color: var(--accink);
+  font-weight: 700;
+}
+.score-area.ko-frozen {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ko-frozen-num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 30px;
+  color: var(--box-num);
+  opacity: 0.85;
+}
+
+/* Read-only knockout gap card in the chronological Jogos list: the real matchup is
+   out but the user's bracket missed it; filling happens on Mata-Mata › Oficial. */
+.fx-gap-pen {
+  text-align: center;
+  font-size: 13px;
+  color: var(--sub);
+  margin-top: 6px;
+}
+.fx-gap-hint {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--bd2);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  color: var(--primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+.fx-gap-hint:hover {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
 /* Read-only official scoreline box (mirrors the .gp-box stepper input) */
 .gp-box.gp-static {
   width: 46px;
