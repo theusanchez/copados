@@ -145,20 +145,29 @@ export function groupsComplete(preds) {
   });
 }
 
-function scorelinePoints(ph, pa, rh, ra) {
+function scorelinePoints(ph, pa, rh, ra, exact = 5, outcome = 3) {
   if (ph == null || pa == null || rh == null || ra == null) return 0;
   ph = Number(ph); pa = Number(pa); rh = Number(rh); ra = Number(ra);
-  if (ph === rh && pa === ra) return 5;
-  return Math.sign(ph - pa) === Math.sign(rh - ra) ? 3 : 0;
+  if (ph === rh && pa === ra) return exact;
+  return Math.sign(ph - pa) === Math.sign(rh - ra) ? outcome : 0;
 }
 
 function sameTeams(a, b) {
   return (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]);
 }
 
-// Points a user earns on one match. Knockout only scores if the predicted
-// matchup (both teams) equals the actual matchup.
-export function matchPoints(matchId, preds, koMatches, results) {
+// Points a user earns on one match.
+//
+// Group stage: 5 exact / 3 outcome on the predicted scoreline.
+//
+// Knockout (hybrid two-tier — see the koLive feature):
+//   - A live re-pick (koLive[matchId]) is a guess on the REAL matchup, made after
+//     the bracket resolved. It scores the reduced 2/1 tier and OVERRIDES the
+//     predicted pick — including when the user had the matchup right but chose to
+//     change the scoreline (touching it forfeits the early-commit bonus).
+//   - Otherwise the predicted bracket pick scores the full 5/3, but only if the
+//     predicted matchup (both teams) equals the real one.
+export function matchPoints(matchId, preds, koMatches, results, koLive = null) {
   const r = results[matchId];
   if (!r || r.status !== 'finished' || r.home == null || r.away == null) return 0;
 
@@ -166,6 +175,12 @@ export function matchPoints(matchId, preds, koMatches, results) {
     const p = preds[matchId];
     if (!p) return 0;
     return scorelinePoints(p.home, p.away, r.home, r.away);
+  }
+
+  const live = koLive && koLive[matchId];
+  if (live && live.home != null && live.away != null) {
+    // The re-pick is already in the real home/away orientation, so no align.
+    return scorelinePoints(live.home, live.away, r.home, r.away, 2, 1);
   }
 
   const km = koMatches[matchId];
@@ -177,20 +192,42 @@ export function matchPoints(matchId, preds, koMatches, results) {
     : scorelinePoints(km.home, km.away, r.away, r.home);
 }
 
-// Total points + breakdown for a user across all known results.
-export function scoreUser(preds, results) {
+// Whether a slot is scored by a live re-pick (used for the points breakdown and
+// to drive the UI's "this is a 2/1 pick" state). A re-pick only applies to KO slots.
+export function isLivePick(matchId, koLive) {
+  if (GROUP_IDS.has(matchId)) return false;
+  const live = koLive && koLive[matchId];
+  return !!(live && live.home != null && live.away != null);
+}
+
+// Whether the user's predicted matchup for a KO slot equals the real one (both
+// teams, unordered). False until the real matchup is resolved. Drives the
+// acertou/errou split that the guided fill screen is built on.
+export function koMatchupHit(matchId, koMatches, results) {
+  const km = koMatches[matchId], r = results[matchId];
+  if (!km || km.homeTeam == null || km.awayTeam == null) return false;
+  if (!r || r.homeTeam == null || r.awayTeam == null) return false;
+  return sameTeams([km.homeTeam, km.awayTeam], [r.homeTeam, r.awayTeam]);
+}
+
+// Total points + breakdown for a user across all known results. `koLive` is the
+// user's live re-picks ({ matchId: {home, away, penWinner?} }); omit it to score
+// the predicted bracket only (back-compatible). `predicted`/`live` split the total
+// so the UI can show "Previsão X · Ao vivo Y".
+export function scoreUser(preds, results, koLive = null) {
   const koMatches = resolveKnockout(preds);
   const groupsDone = groupStageScorable(preds, results);
-  let total = 0, exact = 0, correct = 0;
+  let total = 0, exact = 0, correct = 0, predicted = 0, live = 0;
   Object.keys(results).forEach(id => {
     // Knockout points don't count until the group stage is fully predicted.
     if (!groupsDone && !GROUP_IDS.has(id)) return;
-    const pts = matchPoints(id, preds, koMatches, results);
+    const pts = matchPoints(id, preds, koMatches, results, koLive);
     total += pts;
     if (pts === 5) exact++;
     else if (pts === 3) correct++;
+    if (isLivePick(id, koLive)) live += pts; else predicted += pts;
   });
-  return { total, exact, correct };
+  return { total, exact, correct, predicted, live };
 }
 
 // -----------------------------------------------------------------------
