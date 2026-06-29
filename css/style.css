@@ -1368,21 +1368,6 @@ main {
   margin-bottom: 0.5rem;
 }
 
-/* Desktop: break the bracket out of the 900px main column so more rounds/matches
-   are visible at once instead of floating in the middle with empty sides. */
-@media (min-width: 901px) {
-  #view-knockout {
-    width: 94vw;
-    max-width: 1500px;
-    margin-left: 50%;
-    transform: translateX(-50%);
-  }
-  .ko-bracket {
-    gap: 1rem;
-    margin: 0 auto;
-  }
-}
-
 /* ================================================================
    Compare view
    ================================================================ */
