@@ -118,6 +118,28 @@ export function createFirebaseBackend() {
       }, { merge: true });
     },
 
+    // Knockout live re-picks share the same doc under a `koLive` map (so loading a
+    // user is still one read). Same deep-merge contract as savePred.
+    async saveKoLive(uid, matchId, data) {
+      await setDoc(doc(db, 'predictions', uid), {
+        koLive: { [matchId]: data },
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    },
+
+    async loadKoLive(uid) {
+      const snap = await getDoc(doc(db, 'predictions', uid));
+      return (snap.exists() && snap.data().koLive) || {};
+    },
+
+    // Bulk loader for the roster: both maps in ONE read (ranking scores every user
+    // and needs each user's koLive to score the knockout correctly).
+    async loadUserData(uid) {
+      const snap = await getDoc(doc(db, 'predictions', uid));
+      const d = snap.exists() ? snap.data() : {};
+      return { matches: d.matches || {}, koLive: d.koLive || {} };
+    },
+
     loadPreds,
     loadUserPreds: loadPreds,
 

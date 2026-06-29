@@ -18,6 +18,7 @@ export function createFakeBackend() {
     currentUser: seed.currentUser || null,
     users: seed.users ? [...seed.users] : [],
     predictions: structuredClone(seed.predictions || {}),
+    koLive: structuredClone(seed.koLive || {}),
     results: structuredClone(seed.results || {}),
     leagues: structuredClone(seed.leagues || []),
   };
@@ -113,6 +114,21 @@ export function createFakeBackend() {
     async savePred(uid, matchId, data) {
       if (!state.predictions[uid]) state.predictions[uid] = {};
       state.predictions[uid][matchId] = { ...state.predictions[uid][matchId], ...data };
+    },
+
+    async saveKoLive(uid, matchId, data) {
+      if (!state.koLive[uid]) state.koLive[uid] = {};
+      state.koLive[uid][matchId] = { ...state.koLive[uid][matchId], ...data };
+    },
+
+    async loadKoLive(uid) { return structuredClone(state.koLive[uid] || {}); },
+
+    async loadUserData(uid) {
+      reads.userPreds++;
+      return {
+        matches: structuredClone(state.predictions[uid] || {}),
+        koLive: structuredClone(state.koLive[uid] || {}),
+      };
     },
 
     async loadPreds(uid) { return structuredClone(state.predictions[uid] || {}); },
