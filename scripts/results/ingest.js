@@ -67,6 +67,105 @@ function koDoc(m, homePt, awayPt) {
   return { status, home, away, homeTeam: homePt, awayTeam: awayPt, kickoff: kickoffTs(m), penWinner };
 }
 
+// Match one API knockout fixture to a bracket slot.
+//
+// Non-b3 sides (group winner/runner, or a prior match's winner/loser) resolve to an
+// exact team we trust from the real group results, so they anchor the match. A
+// best-third (b3) side is deliberately NOT matched against the predicted Annex-C table
+// allocation — that allocation drives only the *predicted* bracket and can legitimately
+// differ from FIFA's real one. Instead we anchor on the reliable side (in R32 that's the
+// group winner) and accept whichever eligible third the API actually paired with it, so
+// a table/real mismatch can never leave a b3 fixture unplaced (which showed up as R32
+// games with no result / disappearing from the schedule).
+function findKoFixture(slot, exp, apiKo, usedApi, adv) {
+  const homeB3 = slot.home.type === 'b3';
+  const awayB3 = slot.away.type === 'b3';
+
+  if (!homeB3 && !awayB3) {
+    if (!VALID_TEAMS.has(exp.homeTeam) || !VALID_TEAMS.has(exp.awayTeam)) return null; // unresolved
+    return apiKo.find(k =>
+      k.homePt && k.awayPt && !usedApi.has(k.m.id) &&
+      samePair([k.homePt, k.awayPt], [exp.homeTeam, exp.awayTeam])
+    ) || null;
+  }
+
+  // No bracket slot pairs two b3 sides, so exactly one side is the fuzzy third.
+  const b3Side = homeB3 ? slot.home : slot.away;
+  const anchor = homeB3 ? exp.awayTeam : exp.homeTeam;
+  if (!VALID_TEAMS.has(anchor)) return null; // anchor not resolved yet
+  // Eligible thirds: the real 3rd-placed team of each group this slot can draw from.
+  const eligible = new Set(b3Side.groups.map(g => adv.all[g]?.[2]?.team).filter(Boolean));
+  return apiKo.find(k => {
+    if (!k.homePt || !k.awayPt || usedApi.has(k.m.id)) return false;
+    const other = k.homePt === anchor ? k.awayPt : k.awayPt === anchor ? k.homePt : null;
+    return other != null && eligible.has(other);
+  }) || null;
+}
+
+// Map the raw football-data.org matches to app result docs, keyed by app match ID.
+// Pure (no Firestore/network): the group stage matches by group letter + team pair, the
+// knockout rebuilds the real bracket from finished group results and places each slot via
+// findKoFixture. Returns { docs, unmapped } where unmapped lists resolvable KO fixtures
+// no slot claimed (a draw/name-mismatch signal in the logs).
+export function buildResultDocs(matches) {
+  const docs = {};       // appMatchId -> result doc
+  const unmapped = [];
+
+  // 1) Group stage: match by group letter + unordered team pair.
+  for (const m of matches) {
+    if (m.stage !== 'GROUP_STAGE') continue;
+    const homePt = toPt(m.homeTeam), awayPt = toPt(m.awayTeam);
+    if (!homePt || !awayPt) { unmapped.push(describe(m)); continue; }
+    const letter = (m.group || '').split('_').pop();
+    const grp = GROUPS[letter];
+    const appMatch = grp?.matches.find(x => samePair([x.home, x.away], [homePt, awayPt]));
+    if (!appMatch) { unmapped.push(describe(m)); continue; }
+    docs[appMatch.id] = groupDoc(appMatch, m, homePt, awayPt);
+  }
+
+  // 2) Knockout: rebuild the real bracket with the app's own engine from finished
+  //    group results, then match each round's slots to API fixtures (see findKoFixture).
+  const realGroupPreds = {};
+  for (const [id, d] of Object.entries(docs)) {
+    if (d.status === 'finished' && d.home != null && d.away != null) {
+      realGroupPreds[id] = { home: d.home, away: d.away };
+    }
+  }
+  const adv = computeAdvancing(realGroupPreds);
+
+  const apiKo = matches
+    .filter(m => m.stage !== 'GROUP_STAGE')
+    .map(m => ({ m, homePt: toPt(m.homeTeam), awayPt: toPt(m.awayTeam) }));
+  const usedApi = new Set();
+  const koResults = {};
+
+  for (const round of ROUND_ORDER) {
+    const bracket = buildKnockoutMatches(adv, koResults);
+    for (const slot of KNOCKOUT[round]) {
+      const found = findKoFixture(slot, bracket[slot.id], apiKo, usedApi, adv);
+      if (!found) continue;
+      usedApi.add(found.m.id);
+      const d = koDoc(found.m, found.homePt, found.awayPt);
+      docs[slot.id] = d;
+      if (d.status === 'finished' && d.home != null && d.away != null) {
+        koResults[slot.id] = {
+          home: d.home, away: d.away, homeTeam: d.homeTeam, awayTeam: d.awayTeam, penWinner: d.penWinner,
+        };
+      }
+    }
+  }
+
+  // KO fixtures the API has (with resolvable teams) but we couldn't place in a slot.
+  for (const k of apiKo) {
+    if (k.homePt && k.awayPt && !usedApi.has(k.m.id) &&
+        VALID_TEAMS.has(k.homePt) && VALID_TEAMS.has(k.awayPt)) {
+      unmapped.push(describe(k.m));
+    }
+  }
+
+  return { docs, unmapped };
+}
+
 // --- credentials -----------------------------------------------------------
 
 function loadCredential() {
@@ -116,65 +215,7 @@ async function main() {
       .join(' | '));
   }
 
-  const docs = {};       // appMatchId -> result doc
-  const unmapped = [];
-
-  // 1) Group stage: match by group letter + unordered team pair.
-  for (const m of matches) {
-    if (m.stage !== 'GROUP_STAGE') continue;
-    const homePt = toPt(m.homeTeam), awayPt = toPt(m.awayTeam);
-    if (!homePt || !awayPt) { unmapped.push(describe(m)); continue; }
-    const letter = (m.group || '').split('_').pop();
-    const grp = GROUPS[letter];
-    const appMatch = grp?.matches.find(x => samePair([x.home, x.away], [homePt, awayPt]));
-    if (!appMatch) { unmapped.push(describe(m)); continue; }
-    docs[appMatch.id] = groupDoc(appMatch, m, homePt, awayPt);
-  }
-
-  // 2) Knockout: rebuild the real bracket with the app's own engine from finished
-  //    group results, then match each round's slots to API fixtures by team pair.
-  const realGroupPreds = {};
-  for (const [id, d] of Object.entries(docs)) {
-    if (d.status === 'finished' && d.home != null && d.away != null) {
-      realGroupPreds[id] = { home: d.home, away: d.away };
-    }
-  }
-  const adv = computeAdvancing(realGroupPreds);
-
-  const apiKo = matches
-    .filter(m => m.stage !== 'GROUP_STAGE')
-    .map(m => ({ m, homePt: toPt(m.homeTeam), awayPt: toPt(m.awayTeam) }));
-  const usedApi = new Set();
-  const koResults = {};
-
-  for (const round of ROUND_ORDER) {
-    const bracket = buildKnockoutMatches(adv, koResults);
-    for (const slot of KNOCKOUT[round]) {
-      const exp = bracket[slot.id];
-      if (!VALID_TEAMS.has(exp.homeTeam) || !VALID_TEAMS.has(exp.awayTeam)) continue; // unresolved
-      const found = apiKo.find(k =>
-        k.homePt && k.awayPt && !usedApi.has(k.m.id) &&
-        samePair([k.homePt, k.awayPt], [exp.homeTeam, exp.awayTeam])
-      );
-      if (!found) continue;
-      usedApi.add(found.m.id);
-      const d = koDoc(found.m, found.homePt, found.awayPt);
-      docs[slot.id] = d;
-      if (d.status === 'finished' && d.home != null && d.away != null) {
-        koResults[slot.id] = {
-          home: d.home, away: d.away, homeTeam: d.homeTeam, awayTeam: d.awayTeam, penWinner: d.penWinner,
-        };
-      }
-    }
-  }
-
-  // KO fixtures the API has (with resolvable teams) but we couldn't place in a slot.
-  for (const k of apiKo) {
-    if (k.homePt && k.awayPt && !usedApi.has(k.m.id) &&
-        VALID_TEAMS.has(k.homePt) && VALID_TEAMS.has(k.awayPt)) {
-      unmapped.push(describe(k.m));
-    }
-  }
+  const { docs, unmapped } = buildResultDocs(matches);
 
   // 3) Persist only what changed. Reading the existing docs is what powers the diff
   //    (so we don't rewrite unchanged docs and spam the live `onSnapshot` listeners),
@@ -240,5 +281,8 @@ async function main() {
   }
 }
 
-admin.initializeApp({ credential: loadCredential() });
-main().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
+// Only run as a script; importing (e.g. from tests) must not touch credentials/network.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  admin.initializeApp({ credential: loadCredential() });
+  main().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
+}
