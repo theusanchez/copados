@@ -174,17 +174,23 @@ function sameTeams(a, b) {
   return (a[0] === b[0] && a[1] === b[1]) || (a[0] === b[1] && a[1] === b[0]);
 }
 
+// A slot is "cravado" when the predicted bracket nails the real matchup (both teams)
+// AND carries a committed scoreline behind it. Only then is there a 5/3 pick to freeze.
+function isCravado(km, r) {
+  return !!(km && km.home != null && km.away != null &&
+    sameTeams([km.homeTeam, km.awayTeam], [r.homeTeam, r.awayTeam]));
+}
+
 // Points a user earns on one match.
 //
 // Group stage: 5 exact / 3 outcome on the predicted scoreline.
 //
 // Knockout (hybrid two-tier — see the koLive feature):
-//   - A live re-pick (koLive[matchId]) is a guess on the REAL matchup, made after
-//     the bracket resolved. It scores the reduced 2/1 tier and OVERRIDES the
-//     predicted pick — including when the user had the matchup right but chose to
-//     change the scoreline (touching it forfeits the early-commit bonus).
-//   - Otherwise the predicted bracket pick scores the full 5/3, but only if the
-//     predicted matchup (both teams) equals the real one.
+//   - A nailed matchup with a committed scoreline (cravado) always scores the full 5/3.
+//   - A live re-pick (koLive[matchId]) recovers a GAP — a slot the user missed or left
+//     without a KO scoreline — at the reduced 2/1 tier. It never overrides a cravado, so
+//     scoring self-heals when the bracket allocation shifts a slot from gap→cravado: a
+//     now-orphaned re-pick from the gap era can't rob the correct prediction of its 5/3.
 export function matchPoints(matchId, preds, koMatches, results, koLive = null) {
   const r = results[matchId];
   if (!r || r.status !== 'finished' || r.home == null || r.away == null) return 0;
@@ -195,15 +201,17 @@ export function matchPoints(matchId, preds, koMatches, results, koLive = null) {
     return scorelinePoints(p.home, p.away, r.home, r.away);
   }
 
-  const live = koLive && koLive[matchId];
-  if (live && live.home != null && live.away != null) {
-    // The re-pick is already in the real home/away orientation, so no align.
-    return scorelinePoints(live.home, live.away, r.home, r.away, 2, 1);
+  const km = koMatches[matchId];
+  if (!isCravado(km, r)) {
+    // Not a cravado: a live re-pick (if any) scores the reduced 2/1 tier. The re-pick is
+    // already in the real home/away orientation, so no align. No re-pick → no points.
+    const live = koLive && koLive[matchId];
+    if (live && live.home != null && live.away != null) {
+      return scorelinePoints(live.home, live.away, r.home, r.away, 2, 1);
+    }
+    return 0;
   }
 
-  const km = koMatches[matchId];
-  if (!km || km.home == null || km.away == null) return 0;
-  if (!sameTeams([km.homeTeam, km.awayTeam], [r.homeTeam, r.awayTeam])) return 0;
   // Align the predicted scoreline to the real home/away orientation.
   return km.homeTeam === r.homeTeam
     ? scorelinePoints(km.home, km.away, r.home, r.away)
@@ -243,7 +251,9 @@ export function scoreUser(preds, results, koLive = null) {
     total += pts;
     if (pts === 5) exact++;
     else if (pts === 3) correct++;
-    if (isLivePick(id, koLive)) live += pts; else predicted += pts;
+    // A re-pick only earns "live" points on a gap; a cravado's points are always predicted.
+    const asLive = isLivePick(id, koLive) && !isCravado(koMatches[id], results[id]);
+    if (asLive) live += pts; else predicted += pts;
   });
   return { total, exact, correct, predicted, live };
 }

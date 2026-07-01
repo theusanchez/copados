@@ -185,10 +185,19 @@ function koSlotResolved(id) {
   return !!(r && r.homeTeam != null && r.awayTeam != null);
 }
 
-// A slot the user got wrong (or never predicted): resolved, but the predicted
-// matchup doesn't equal the real one. These are the ones a live re-pick recovers.
+// A slot the user truly nailed: the matchup is right AND there's a full predicted
+// scoreline behind it, so it scores the frozen 5/3. A matchup that's only "right"
+// because the group stage resolved the teams — with no KO scoreline ever entered —
+// is NOT cravado (it scores 0); it's a gap the user still has to fill.
+function koCravado(id) {
+  const km = currentUserKo[id];
+  return koMatchupHit(id, currentUserKo, results) && km && km.home != null && km.away != null;
+}
+
+// A slot the user got wrong (or never gave a scoreline): resolved, but not a cravado.
+// These are the ones a live re-pick recovers (2/1 tier).
 function koIsGap(id) {
-  return koSlotResolved(id) && !koMatchupHit(id, currentUserKo, results);
+  return koSlotResolved(id) && !koCravado(id);
 }
 
 // Slots that still need action now: resolved, errou, unlocked, and not yet given a
@@ -1299,9 +1308,8 @@ function renderOfficialKnockout() {
   const gaps = [], cravados = [];
   KO_ROUNDS.forEach(rk => KNOCKOUT[rk].forEach(m => {
     if (!koSlotResolved(m.id)) return;
-    const hit = koMatchupHit(m.id, currentUserKo, results);
     const editable = isLivePick(m.id, koLive) || koSwapping.has(m.id);
-    if (hit && !editable) cravados.push(m);
+    if (koCravado(m.id) && !editable) cravados.push(m);
     else gaps.push(m);
   }));
 
@@ -1367,7 +1375,7 @@ function renderKoLiveCard(m) {
       </label>
     </div>`;
 
-  const undo = (!locked && (isLivePick(m.id, koLive) || koSwapping.has(m.id)) && koMatchupHit(m.id, currentUserKo, results))
+  const undo = (!locked && (isLivePick(m.id, koLive) || koSwapping.has(m.id)) && koCravado(m.id))
     ? `<button class="ko-swap-cancel" type="button" data-match-id="${m.id}">${t('ko.swapCancel')}</button>` : '';
 
   return `
@@ -1761,12 +1769,12 @@ function renderFixturesView({ scroll = false } = {}) {
 function renderFixtureCard(it, focused = false) {
   const { match, isKnockout, homeTeam, awayTeam, ms } = it;
 
-  // A resolved knockout slot whose real matchup differs from the user's predicted
-  // bracket is a "gap": it's re-picked on the Mata-Mata › Oficial screen (2/1 tier).
-  // In this chronological list it stays read-only, so a score typed against the
+  // A resolved knockout slot the user didn't nail (wrong matchup, or right matchup but
+  // no scoreline) is a "gap": it's re-picked on the Mata-Mata › Oficial screen (2/1
+  // tier). In this chronological list it stays read-only, so a score typed against the
   // official teams can never leak into the predicted-bracket store (which would then
   // surface as the user's *wrong* matchup over in the Mata-Mata view).
-  if (isKnockout && koSlotResolved(match.id) && !koMatchupHit(match.id, currentUserKo, results)) {
+  if (isKnockout && koIsGap(match.id)) {
     return renderFixtureGapCard(it, focused);
   }
 
